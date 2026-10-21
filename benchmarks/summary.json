@@ -2,31 +2,31 @@
  "identify": {
   "uniform": {
    "kind": "baseline",
-   "value": 6.1
+   "value": 9.7
   },
   "lucb": {
    "kind": "fixed confidence",
-   "value": 32.0
+   "value": 38.3
   },
   "successive_elimination": {
    "kind": "fixed confidence",
-   "value": 31.8
+   "value": 38.2
   },
   "lil_ucb": {
    "kind": "fixed confidence",
-   "value": 18.2
+   "value": 18.8
   },
   "top_two_ts": {
    "kind": "fixed confidence",
-   "value": 11.7
+   "value": 15.1
   },
   "track_and_stop": {
    "kind": "fixed confidence",
-   "value": 21.9
+   "value": 26.8
   },
   "eb_tc": {
    "kind": "fixed confidence",
-   "value": 20.5
+   "value": 26.2
   },
   "successive_halving": {
    "kind": "fixed budget",
@@ -40,7 +40,7 @@
  "estimate": {
   "random": {
    "kind": "baseline",
-   "value": 3.3
+   "value": 3.2
   },
   "stratified": {
    "kind": "classical",
@@ -48,7 +48,7 @@
   },
   "anchor_points": {
    "kind": "representative subset",
-   "value": 2.3
+   "value": 2.1
   },
   "irt": {
    "kind": "model-based",
@@ -58,43 +58,45 @@
  "online": {
   "uniform": {
    "kind": "baseline",
-   "value": 75.5
+   "value": 79.3
   },
   "epsilon_greedy": {
    "kind": "non-contextual",
-   "value": 93.4
+   "value": 95.3
   },
   "ucb1": {
    "kind": "non-contextual",
-   "value": 87.0
+   "value": 89.8
   },
   "kl_ucb": {
    "kind": "non-contextual",
-   "value": 92.4
+   "value": 94.3
   },
   "thompson": {
    "kind": "non-contextual",
-   "value": 93.8
+   "value": 95.4
   },
   "exp3": {
    "kind": "adversarial",
-   "value": 85.1
+   "value": 88.2
   },
   "linucb": {
    "kind": "contextual",
-   "value": 101.3
+   "value": 102.8
   },
   "lin_ts": {
    "kind": "contextual",
-   "value": 102.0
+   "value": 103.4
   }
  },
  "_meta": {
   "tasks": [
-   "gsm8k",
    "arc_challenge",
-   "winogrande",
-   "truthfulqa"
+   "gsm8k",
+   "hellaswag",
+   "mmlu",
+   "truthfulqa",
+   "winogrande"
   ],
   "trials": 20
  }
