@@ -11,7 +11,7 @@ Three problems, one interface:
 
     fe.list_methods()                          # every method, with its paper
 """
-from . import tasks
+from . import datasets, tasks
 from .estimate import EstimateResult, estimate
 from .identify import ALGORITHMS, Evaluation, Result, find_best, identify
 from .online import OnlineResult, Policy, run_online
@@ -24,4 +24,4 @@ __all__ = [
     "Result", "EstimateResult", "OnlineResult", "Evaluation", "Policy", "MethodInfo",
     "MatrixSource", "FunctionSource", "ALGORITHMS",
 ]
-__version__ = "0.3.0"
+__version__ = "0.4.0"

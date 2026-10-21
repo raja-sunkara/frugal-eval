@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Cost-aware online selection: `run_online(..., cost_weight=)` trades quality against dollar cost
+- RouterBench task (Hu et al., 2024): 11 LLMs on 36k real prompts with real costs, downloaded from
+  Hugging Face on first use (`pip install "frugal-eval[routerbench]"`), with prompt embeddings
+- Benchmark workflow on GitHub: one parallel job per task, now including MMLU and HellaSwag, plus RouterBench
+- Data workflow that downloads external datasets in GitHub Actions for review
+
 ## 0.3.0
 
 - New "find the best" methods: Track-and-Stop (Garivier & Kaufmann, COLT 2016) and EB-TC (Jourdan, Degenne & Kaufmann, NeurIPS 2023)

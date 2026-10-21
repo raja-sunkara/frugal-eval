@@ -14,7 +14,7 @@ It covers three problems, with 21 methods so far:
 |---|---|---|
 | **Find the best** (`identify`) | Which prompt or model is best, using as few calls as possible? | Certified winner with up to 75% fewer calls |
 | **Estimate scores** (`estimate`) | What would each model score on the full benchmark, from a few questions? | Scores within ~2 points from 100 of 1,319 questions |
-| **Online selection** (`run_online`) | Which model should answer each incoming request while you are still learning? | Routing that beats every single model |
+| **Online selection** (`run_online`) | Which model should answer each incoming request while you are still learning? | 94% of GPT-4's quality at 23% of its cost on RouterBench |
 
 ## Try it in 30 seconds (no API key)
 
@@ -130,6 +130,28 @@ Savings in "find the best" depend on how close the candidates are: when the top 
 
 Full tables, per task: [BENCHMARKS.md](BENCHMARKS.md). Reproduce: `python benchmarks/run_all.py`.
 
+## Cost-aware routing on RouterBench
+
+[RouterBench](https://arxiv.org/abs/2403.12031) (Hu et al., 2024) has 36,497 real prompts answered by 11 LLMs, from GPT-4 and Claude to Mixtral and Llama, with the dollar cost of every answer. Each method sees every prompt once, picks one model, and learns only from the result it gets, scored as quality minus `cost_weight` × cost. Relative to always using the single best model (GPT-4), 3 trials:
+
+| Method | cost weight 0 | cost weight 0.5 | cost weight 1 |
+|---|---|---|---|
+| `linucb` (contextual) | 99% quality, 79% cost | **94% quality, 23% cost** | 88% quality, 13% cost |
+| `lin_ts` (contextual) | 99% quality, 78% cost | 93% quality, 22% cost | 90% quality, 16% cost |
+| `thompson` | 100% quality, 99% cost | 84% quality, 15% cost | 82% quality, 7% cost |
+| `uniform` (baseline) | 66% quality, 25% cost | 66% quality, 25% cost | 66% quality, 25% cost |
+
+Learning from scratch, the contextual routers keep 94% of GPT-4's quality for under a quarter of the price. All methods: [BENCHMARKS.md](BENCHMARKS.md).
+
+```python
+import frugal_eval as fe
+
+task = fe.tasks.make("routerbench")      # downloads from Hugging Face on first use (pip install "frugal-eval[routerbench]")
+fe.run_online(task, method="linucb", cost_weight=0.5).summary()
+```
+
+For your own traffic, pass `costs=` (cost per candidate per example) and `features=` (e.g. a prompt embedding) to `fe.tasks.from_scores`, or route live with `fe.tasks.from_function`.
+
 ## Add a method or a task
 
 Every method is a plugin. Register it once and it works in the API, the CLI and the benchmark:
@@ -158,7 +180,7 @@ Planned additions, all from published work:
 - Confidence sequences for sampling without replacement (Waudby-Smith & Ramdas, NeurIPS 2020)
 - Low-rank evaluation acceleration (Zhou et al., ICLR 2025) and model-similarity methods (SySRs, ICML 2026)
 - gp-IRT and more estimators from tinyBenchmarks (Polo et al., ICML 2024)
-- Cost-aware routing between strong and cheap models
+- More routing benchmarks and per-request budgets
 - Integrations with promptfoo, Inspect and lm-evaluation-harness; PyPI release
 
 ## Citation and data

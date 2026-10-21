@@ -22,11 +22,22 @@ class OnlineResult:
     method: str
     names: list[str]
     choices: np.ndarray
-    rewards: np.ndarray
+    rewards: np.ndarray                      # what was optimised: the score, or score minus cost penalty
     examples: np.ndarray
     best_fixed_reward: float | None = None   # total reward of the best single candidate on this stream
     oracle_reward: float | None = None       # total reward of a perfect per-example router
+    scores: np.ndarray | None = None         # quality of each answer
+    costs: np.ndarray | None = None          # cost of each call, when the task has costs
+    cost_weight: float = 0.0
     extra: dict = field(default_factory=dict, repr=False)
+
+    @property
+    def average_score(self) -> float:
+        return float((self.scores if self.scores is not None else self.rewards).mean())
+
+    @property
+    def total_cost(self) -> float | None:
+        return None if self.costs is None else float(self.costs.sum())
 
     @property
     def total_reward(self) -> float:
@@ -46,10 +57,13 @@ class OnlineResult:
         return np.bincount(self.choices, minlength=len(self.names))
 
     def summary(self) -> str:
-        lines = [f"Method: {self.method}. Requests: {len(self.choices)}. Average score: {self.average_reward:.3f}"]
+        lines = [f"Method: {self.method}. Requests: {len(self.choices)}. Average score: {self.average_score:.3f}"]
+        if self.costs is not None:
+            lines.append(f"Total cost: {self.total_cost:.4f} ({self.total_cost / len(self.choices):.6f} per request); "
+                         f"cost weight {self.cost_weight:g}")
         if self.best_fixed_reward is not None:
             T = len(self.choices)
-            lines.append(f"Best single candidate would average {self.best_fixed_reward / T:.3f}; "
+            lines.append(f"Best single candidate would average {self.best_fixed_reward / T:.3f} (objective); "
                          f"regret {self.regret:.1f} ({self.regret / T:+.3f} per request)")
         if self.oracle_reward is not None:
             lines.append(f"Perfect per-request routing would average {self.oracle_reward / len(self.choices):.3f}")
@@ -227,8 +241,13 @@ class LinTS(LinUCB):
 
 
 def run_online(task: Any, method: str = "thompson", *, horizon: int | None = None, seed: int | None = 0,
-               **options: Any) -> OnlineResult:
-    """Simulate (or run live) online selection over a stream of the task's examples."""
+               cost_weight: float = 0.0, cost_scale: float | None = None, **options: Any) -> OnlineResult:
+    """Simulate (or run live) online selection over a stream of the task's examples.
+
+    With ``cost_weight`` > 0 (and ``task.costs``), each call is rewarded by
+    ``score - cost_weight * cost / cost_scale``, rescaled to [0, 1], so methods
+    trade quality against spend. ``cost_scale`` defaults to the 99th percentile cost.
+    """
     if not hasattr(task, "source"):
         from .tasks import from_scores
         task = from_scores(task)
@@ -240,19 +259,37 @@ def run_online(task: Any, method: str = "thompson", *, horizon: int | None = Non
     feats = None if task.features is None else np.asarray(task.features, dtype=float)
     if info.needs_features and feats is None:
         raise ValueError(f"{method} needs task.features (one vector per example)")
+    costs = None if task.costs is None else np.asarray(task.costs, dtype=float)
+    if cost_weight > 0 and costs is None:
+        raise ValueError("cost_weight > 0 needs task.costs (cost of each candidate on each example)")
+    lam = float(cost_weight)
+    scale = float(cost_scale) if cost_scale else (float(np.quantile(costs, 0.99)) if costs is not None else 1.0)
+    scale = max(scale, 1e-12)
+
+    def utility(score: np.ndarray | float, cost: np.ndarray | float) -> np.ndarray | float:
+        if lam == 0:
+            return score
+        return (score - lam * np.minimum(np.asarray(cost) / scale, 1.0) + lam) / (1 + lam)
+
     policy = info.fn(K, rng, dim=None if feats is None else feats.shape[1], horizon=T, **options)
-    choices, rewards = np.empty(T, dtype=int), np.empty(T)
+    choices, scores_seen, costs_seen = np.empty(T, dtype=int), np.empty(T), np.zeros(T)
+    rewards = np.empty(T)
     for t, i in enumerate(stream):
         x = None if feats is None else feats[i]
         arm = policy.select(x)
         r = task.source.score_many([(arm, int(i))])[0]
-        policy.update(arm, r, x)
-        choices[t], rewards[t] = arm, r
+        c = costs[arm, i] if costs is not None else 0.0
+        u = float(utility(r, c))
+        policy.update(arm, u, x)
+        choices[t], scores_seen[t], costs_seen[t], rewards[t] = arm, r, c, u
     best_fixed = oracle = None
-    scores = getattr(task.source, "scores", None)
-    if scores is not None:  # replay: the full matrix is known, so regret can be computed
-        sub = scores[:, stream]
+    full = getattr(task.source, "scores", None)
+    if full is not None:  # replay: the full matrix is known, so regret can be computed
+        sub = full[:, stream]
+        if costs is not None and lam > 0:
+            sub = utility(sub, costs[:, stream])
         best_fixed = float(sub.sum(1).max())
         oracle = float(sub.max(0).sum())
     return OnlineResult(method=method, names=task.names, choices=choices, rewards=rewards, examples=stream,
-                        best_fixed_reward=best_fixed, oracle_reward=oracle)
+                        best_fixed_reward=best_fixed, oracle_reward=oracle, scores=scores_seen,
+                        costs=None if costs is None else costs_seen, cost_weight=lam)

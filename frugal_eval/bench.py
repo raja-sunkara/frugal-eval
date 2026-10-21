@@ -114,3 +114,47 @@ def to_markdown(problem: str, rows: list[dict]) -> str:
         cells = " | ".join(cell(s[(m, t)]) for t in tasks)
         lines.append(f"| `{m}` | {info[m].kind} | {cells} | {fmt_avg(avg(m))} |")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- routing with costs
+ROUTING_WEIGHTS = (0.0, 0.5, 1.0)
+
+
+def _routing_one(job: tuple) -> dict:
+    method, weight, trial = job
+    from .tasks import make
+
+    task = make("routerbench")
+    S, C = task.source.scores, task.costs
+    ref = int(np.argmax(S.mean(1)))  # best single model (GPT-4 on RouterBench)
+    r = run_online(task, method=method, seed=trial, cost_weight=weight)
+    stream = r.examples
+    return dict(problem="routing", method=method, task=f"cost weight {weight:g}", trial=trial,
+                score_vs_best=r.average_score / S[ref, stream].mean(),
+                cost_vs_best=r.total_cost / C[ref, stream].sum(), score=r.average_score)
+
+
+def run_routing(methods: Sequence[str] | None = None, weights: Sequence[float] = ROUTING_WEIGHTS,
+                trials: int = 5, workers: int | None = None) -> list[dict]:
+    """Online methods on RouterBench, trading answer quality against dollar cost."""
+    methods = list(methods) if methods else [m.name for m in list_methods("online")]
+    jobs = [(m, w, i) for m in methods for w in weights for i in range(trials)]
+    workers = workers or os.cpu_count() or 1
+    if workers == 1:
+        return [_routing_one(j) for j in jobs]
+    with Pool(workers) as pool:
+        return pool.map(_routing_one, jobs, chunksize=1)
+
+
+def routing_markdown(rows: list[dict]) -> str:
+    s = summarize(rows)
+    methods = list(dict.fromkeys(r["method"] for r in rows))
+    settings = list(dict.fromkeys(r["task"] for r in rows))
+    info = {m.name: m for m in list_methods("online")}
+    lines = ["| Method | Type | " + " | ".join(settings) + " |", "|" + "---|" * (len(settings) + 2)]
+    key = settings[1] if len(settings) > 1 else settings[0]
+    for m in sorted(methods, key=lambda m: -(s[(m, key)]["score_vs_best"] - s[(m, key)]["cost_vs_best"])):
+        cells = " | ".join(f"{s[(m, t)]['score_vs_best']:.0%} quality, {s[(m, t)]['cost_vs_best']:.0%} cost"
+                           for t in settings)
+        lines.append(f"| `{m}` | {info[m].kind} | {cells} |")
+    return "\n".join(lines)

@@ -174,3 +174,29 @@ def test_track_and_stop_weights_match_paper_example():
 
     w = optimal_weights(np.array([0.5, 0.45, 0.43, 0.4]))
     assert np.allclose(w, [0.417, 0.390, 0.136, 0.057], atol=2e-3)
+
+
+def test_cost_aware_routing_moves_to_cheaper_models():
+    rng = np.random.default_rng(0)
+    scores = (rng.random((3, 3000)) < np.array([[0.8], [0.75], [0.5]])).astype(float)
+    costs = np.array([[0.03], [0.003], [0.0005]]) * np.ones((1, 3000))
+    task = fe.tasks.from_scores(scores, names=["big", "mid", "small"], costs=costs)
+    plain = fe.run_online(task, method="thompson")
+    frugal = fe.run_online(task, method="thompson", cost_weight=0.5)
+    assert frugal.total_cost < 0.5 * plain.total_cost
+    assert frugal.average_score > 0.7
+    with pytest.raises(ValueError):
+        fe.run_online(synthetic(), method="thompson", cost_weight=1.0)
+
+
+def test_routerbench_task_when_cached():
+    import os
+
+    from frugal_eval.datasets import cache_dir
+
+    if not os.path.exists(os.path.join(cache_dir(), "routerbench.npz")):
+        pytest.skip("RouterBench not downloaded (frugal_eval.datasets.load_routerbench)")
+    task = fe.tasks.make("routerbench", n_examples=2000, seed=0)
+    assert task.n_candidates == 11 and task.costs.shape == (11, 2000)
+    r = fe.run_online(task, method="linucb", cost_weight=0.5)
+    assert r.total_cost < task.costs[int(np.argmax(task.truth))].sum()

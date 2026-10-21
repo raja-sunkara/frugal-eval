@@ -18,7 +18,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from frugal_eval.bench import DEFAULT_TASKS, run, to_markdown  # noqa: E402
+from frugal_eval.bench import DEFAULT_TASKS, routing_markdown, run, run_routing, to_markdown  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -31,6 +31,11 @@ INTRO = {
                  "10 random leaderboard models per trial, 100 examples each; methods that learn from history "
                  "use 300 other leaderboard models. Cells: mean absolute error in percentage points and rank "
                  "correlation with the true scores."),
+    "routing": ("Cost-aware routing on RouterBench",
+                "RouterBench (Hu et al., 2024): 36,497 real prompts, 11 LLMs, the dollar cost of every answer. "
+                "Every prompt arrives once; the method picks one model per prompt and learns from the score it "
+                "gets, penalised by cost times the cost weight. Cells: quality and total cost relative to always "
+                "using the single best model (GPT-4). Contextual methods use a prompt embedding."),
     "online": ("Online selection and routing",
                "10 random leaderboard models; every question in the benchmark arrives once in random order "
                "and the method picks one model per question. Cells: average score and its share of what "
@@ -62,7 +67,10 @@ def main() -> None:
     raw = {}
     for problem in args.problems:
         t0 = time.time()
-        raw[problem] = run(problem, tasks=args.tasks, trials=args.trials)
+        if problem == "routing":
+            raw[problem] = run_routing(trials=min(args.trials, 5))
+        else:
+            raw[problem] = run(problem, tasks=args.tasks, trials=args.trials)
         print(f"{problem}: {len(raw[problem])} runs in {time.time() - t0:.0f}s", flush=True)
     if args.raw_only:
         os.makedirs(os.path.dirname(os.path.abspath(args.raw_only)), exist_ok=True)
@@ -78,12 +86,13 @@ def main() -> None:
 
 
 def write_reports(raw: dict, trials: int) -> None:
-    order = [p for p in ("identify", "estimate", "online") if p in raw]
-    tasks = list(dict.fromkeys(r["task"] for p in order for r in raw[p]))
+    order = [p for p in ("identify", "estimate", "online", "routing") if p in raw]
+    tasks = list(dict.fromkeys(r["task"] for p in order if p != "routing" for r in raw[p]))
     sections = []
     for problem in order:
         title, text = INTRO[problem]
-        sections.append(f"## {title}\n\n{text}\n\n{to_markdown(problem, raw[problem])}\n")
+        table = routing_markdown(raw[problem]) if problem == "routing" else to_markdown(problem, raw[problem])
+        sections.append(f"## {title}\n\n{text}\n\n{table}\n")
     header = ("# Benchmarks\n\nEvery method on the same real data: per-question results of 395 models from the "
               "Open LLM Leaderboard (via tinyBenchmarks, MIT license). "
               f"Tasks: {', '.join(tasks)}. {trials} trials per task. "
@@ -107,6 +116,8 @@ def write_summary(raw: dict, tasks: list | None = None, trials: int | None = Non
     metric = {"identify": ("savings", 100), "estimate": ("mae", 100), "online": (None, 100)}
     out = {}
     for problem, rows in raw.items():
+        if problem == "routing":
+            continue
         s = summarize(rows)
         kinds = {m.name: m.kind for m in list_methods(problem)}
         methods = dict.fromkeys(r["method"] for r in rows)

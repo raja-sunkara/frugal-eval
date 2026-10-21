@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frugal-eval"
-version = "0.3.0"
+version = "0.4.0"
 description = "Methods from the research literature for cheaper LLM evaluation and online model selection."
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,6 +20,8 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+routerbench = ["huggingface_hub>=0.20", "pandas>=1.5"]
+embeddings = ["sentence-transformers>=2.2"]
 
 [project.scripts]
 frugal-eval = "frugal_eval.cli:main"

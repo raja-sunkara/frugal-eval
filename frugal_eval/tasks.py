@@ -36,6 +36,7 @@ class Task:
     features: np.ndarray | None = None
     truth: np.ndarray | None = None
     info: dict = field(default_factory=dict)
+    costs: np.ndarray | None = None  # optional cost of each call, shape (n_candidates, n_examples)
 
     @property
     def names(self) -> list[str]:
@@ -51,10 +52,13 @@ class Task:
 
 
 def from_scores(scores: Any, names: Sequence[str] | None = None, *, prior: Any = None,
-                features: Any = None, name: str = "custom") -> Task:
-    """A task from scores you already have (n_candidates x n_examples), e.g. for replay."""
+                features: Any = None, costs: Any = None, name: str = "custom") -> Task:
+    """A task from scores you already have (n_candidates x n_examples), e.g. for replay.
+
+    ``costs`` (same shape, e.g. dollars per call) enables cost-aware routing.
+    """
     source = MatrixSource(scores, names)
-    return Task(name, source, _opt(prior), _opt(features), truth=source.scores.mean(1))
+    return Task(name, source, _opt(prior), _opt(features), truth=source.scores.mean(1), costs=_opt(costs))
 
 
 def from_function(candidates: Sequence[Any], examples: Sequence[Any], score_fn: Callable[[Any, Any], float], *,
@@ -173,3 +177,40 @@ def synthetic(n_candidates: int = 10, n_examples: int = 1000, seed: int = 0, n_p
     mat, prior = x[:n_candidates], x[n_candidates:]
     return Task("synthetic", MatrixSource(mat), prior=prior, features=example_features(prior),
                 truth=mat.mean(1), info={"seed": seed})
+
+
+def _coarse(name: str) -> str:
+    for prefix in ("mmlu", "chinese", "mtbench"):
+        if name.lower().startswith(prefix):
+            return prefix
+    return name.lower()
+
+
+@register_task("routerbench")
+def routerbench(n_examples: int | None = None, seed: int = 0, features: str = "embedding",
+                path: str | None = None) -> Task:
+    """RouterBench (Hu et al., 2024): 11 LLMs on 36k real prompts, with the dollar cost of every answer.
+
+    Downloaded from Hugging Face on first use (see ``frugal_eval.datasets``). ``features`` for
+    contextual routing: "embedding" (prompt embedding plus benchmark type, when available) or
+    "benchmark" (benchmark type only).
+    """
+    from .datasets import load_routerbench
+
+    d = load_routerbench(path)
+    scores, costs = d["scores"].astype(float), d["costs"].astype(float)
+    bench = d["benchmark"].astype(int)
+    coarse = np.array([_coarse(str(n)) for n in d["benchmark_names"]])[bench]
+    kinds, kind_idx = np.unique(coarse, return_inverse=True)
+    cols = np.arange(scores.shape[1])
+    if n_examples is not None and n_examples < len(cols):
+        cols = np.sort(np.random.default_rng(seed).choice(cols, n_examples, replace=False))
+    onehot = np.eye(len(kinds))[kind_idx[cols]]
+    parts = [np.ones((len(cols), 1)), onehot]
+    if features == "embedding" and "embedding" in d:
+        emb = d["embedding"].astype(float)[cols]
+        parts.insert(1, emb / max(np.linalg.norm(emb, axis=1).max(), 1e-12))
+    mat = scores[:, cols]
+    return Task("routerbench", MatrixSource(mat, [str(m) for m in d["models"]]), features=np.hstack(parts),
+                truth=mat.mean(1), costs=costs[:, cols],
+                info={"benchmark_kind": coarse[cols], "source": "https://huggingface.co/datasets/withmartian/routerbench"})

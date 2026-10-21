@@ -33,14 +33,29 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - run: python benchmarks/run_all.py --tasks ${{ matrix.task }} --trials ${{ inputs.trials || '20' }} --raw-only out/${{ matrix.task }}.json
+      - run: python benchmarks/run_all.py --tasks ${{ matrix.task }} --problems identify estimate online --trials ${{ inputs.trials || '20' }} --raw-only out/${{ matrix.task }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: raw-${{ matrix.task }}
           path: out/${{ matrix.task }}.json
 
+  routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[routerbench,embeddings]"
+      - run: python benchmarks/run_all.py --problems routing --trials 5 --raw-only out/routing.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-routing
+          path: out/routing.json
+
   report:
-    needs: run
+    needs: [run, routing]
     if: always()
     runs-on: ubuntu-latest
     steps:
