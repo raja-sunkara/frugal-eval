@@ -8,3 +8,4 @@ dist/
 *.db
 benchmarks/results/
 .DS_Store
+uv.lock
