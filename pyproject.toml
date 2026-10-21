@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frugal-eval"
-version = "0.1.0"
-description = "Find your best prompt or model with fewer evaluation calls, with a statistical guarantee."
+version = "0.2.0"
+description = "Methods from the research literature for cheaper LLM evaluation and online model selection."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Raja Sunkara" }]
 requires-python = ">=3.9"
 dependencies = ["numpy>=1.23", "httpx>=0.24"]
-keywords = ["llm", "evaluation", "bandits", "best-arm identification", "prompt engineering"]
+keywords = ["llm", "evaluation", "bandits", "best-arm identification", "online learning", "model routing", "item response theory", "prompt engineering"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
@@ -29,3 +29,6 @@ Homepage = "https://github.com/raja-sunkara/frugal-eval"
 
 [tool.setuptools]
 packages = ["frugal_eval"]
+
+[tool.setuptools.package-data]
+frugal_eval = ["data/*.npz", "data/NOTICE"]

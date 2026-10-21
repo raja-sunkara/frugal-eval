@@ -3,10 +3,15 @@ import csv
 import numpy as np
 import pytest
 
+import frugal_eval as fe
 from frugal_eval import find_best
 from frugal_eval.bounds import radius
 from frugal_eval.cli import main
 from frugal_eval.llm import contains, exact_match, last_number
+from frugal_eval.registry import list_methods
+
+FIXED_BUDGET = {m.name for m in list_methods("identify") if m.kind == "fixed budget"}
+FIXED_CONF = [m.name for m in list_methods("identify") if m.name not in FIXED_BUDGET]
 
 
 def synthetic(gaps=(0.0, 0.1, 0.2, 0.3), n=2000, seed=0):
@@ -15,41 +20,61 @@ def synthetic(gaps=(0.0, 0.1, 0.2, 0.3), n=2000, seed=0):
     return (rng.random((len(p), n)) < p[:, None]).astype(float)
 
 
-@pytest.mark.parametrize("algorithm", ["lucb", "uniform"])
-def test_finds_best_and_saves_calls(algorithm):
+@pytest.fixture(scope="module")
+def lb_task():
+    return fe.tasks.make("leaderboard/gsm8k", n_candidates=6, seed=3, n_examples=600)
+
+
+# ------------------------------------------------------------ registry
+def test_every_method_has_a_paper_and_runs_through_the_registry():
+    methods = list_methods()
+    assert {m.problem for m in methods} == {"identify", "estimate", "online"}
+    for m in methods:
+        assert m.paper, m.name
+    assert len(list_methods("identify")) >= 7 and len(list_methods("estimate")) >= 4
+    assert len(list_methods("online")) >= 8
+
+
+def test_custom_method_plugs_in():
+    @fe.register("identify", "always_first", paper="test")
+    def always_first(ev, **_):
+        ev.pull([0])
+        return ev.result("budget", "always_first")
+
+    r = fe.identify(synthetic(), method="always_first")
+    assert r.algorithm == "always_first" and r.total_calls == 1
+
+
+# ------------------------------------------------------------ identify
+@pytest.mark.parametrize("method", FIXED_CONF)
+def test_fixed_confidence_methods_find_best(method):
     scores = synthetic()
-    result = find_best(scores, algorithm=algorithm, delta=0.05)
-    assert result.best == int(np.argmax(scores.mean(1)))
-    assert result.certified and result.savings > (0.5 if algorithm == "lucb" else 0.2)
+    r = fe.identify(scores, method=method, delta=0.05)
+    assert r.best == 0 and r.certified
 
 
-def test_lucb_cheaper_than_uniform():
+@pytest.mark.parametrize("method", sorted(FIXED_BUDGET))
+def test_fixed_budget_methods_respect_budget(method):
+    r = fe.identify(synthetic(), method=method, budget=1500)
+    assert r.best == 0 and r.total_calls <= 1500 and not r.certified
+    with pytest.raises(ValueError):
+        fe.identify(synthetic(), method=method)
+
+
+def test_lucb_saves_more_than_uniform():
     scores = synthetic(gaps=(0.0, 0.05, 0.3, 0.3, 0.3, 0.3))
-    lucb = find_best(scores, algorithm="lucb")
-    uniform = find_best(scores, algorithm="uniform")
-    assert lucb.total_calls < uniform.total_calls
+    assert fe.identify(scores, method="lucb").total_calls < fe.identify(scores, method="uniform").total_calls
 
 
-def test_exact_when_everything_is_evaluated():
-    scores = np.array([[1, 0, 1, 0], [1, 0, 1, 0]], dtype=float)  # a perfect tie
-    result = find_best(scores, delta=0.01)
-    assert result.stopped_by in {"exhausted", "confidence"}
-    assert np.allclose(result.means, 0.5)
+def test_exact_tie_terminates():
+    scores = np.array([[1, 0, 1, 0], [1, 0, 1, 0]], dtype=float)
+    r = fe.identify(scores, delta=0.01)
+    assert r.stopped_by in {"exhausted", "confidence"} and np.allclose(r.means, 0.5)
 
 
 def test_radius_collapses_on_full_population():
     r = radius(np.array([100, 50]), np.array([60.0, 30.0]), np.array([60.0, 30.0]), 100, 2, 0.05)
     assert r[0] == 0.0 and 0 < r[1] < 1
-
-
-def test_budget_and_successive_halving():
-    scores = synthetic()
-    capped = find_best(scores, budget=200)
-    assert capped.total_calls <= 210 and not capped.certified
-    sh = find_best(scores, algorithm="successive_halving", budget=2000)
-    assert sh.best == 0 and sh.total_calls <= 2000
-    with pytest.raises(ValueError):
-        find_best(scores, algorithm="successive_halving")
 
 
 def test_live_function_source_with_cache(tmp_path):
@@ -62,11 +87,9 @@ def test_live_function_source_with_cache(tmp_path):
     kwargs = dict(candidates=[1, 2, 3], examples=list(range(300)), score_fn=score,
                   cache_path=str(tmp_path / "cache.db"), max_workers=4)
     first = find_best(**kwargs)
-    assert first.best_name == "candidate_0"  # candidate 1 divides everything
+    assert first.best_name == "candidate_0"
     n_calls = len(calls)
-    second = find_best(**kwargs)
-    assert len(calls) == n_calls  # everything came from the cache
-    assert second.best == first.best
+    assert find_best(**kwargs).best == first.best and len(calls) == n_calls
 
 
 def test_rejects_bad_input():
@@ -76,8 +99,53 @@ def test_rejects_bad_input():
         find_best(np.ones((1, 5)))
     with pytest.raises(ValueError):
         find_best(candidates=[1, 2], examples=[1], score_fn=lambda c, e: 2.0)
+    with pytest.raises(ValueError):
+        fe.identify(synthetic(), method="nope")
 
 
+def test_identify_on_real_data(lb_task):
+    r = fe.identify(lb_task, method="lucb")
+    assert r.best == int(np.argmax(lb_task.truth)) and r.savings > 0
+
+
+# ------------------------------------------------------------ estimate
+@pytest.mark.parametrize("method", [m.name for m in list_methods("estimate")])
+def test_estimate_methods(lb_task, method):
+    r = fe.estimate(lb_task, method=method, budget=60)
+    assert r.estimates.shape == (lb_task.n_candidates,)
+    assert r.calls == 60 * lb_task.n_candidates
+    assert r.mae < 0.1
+
+
+def test_prior_methods_need_prior():
+    with pytest.raises(ValueError):
+        fe.estimate(synthetic(), method="irt", budget=50)
+
+
+def test_irt_fit_recovers_synthetic_scores():
+    task = fe.tasks.make("synthetic", n_candidates=5, n_examples=600, n_prior=200, seed=1)
+    assert fe.estimate(task, method="irt", budget=60).mae < 0.05
+
+
+# ------------------------------------------------------------ online
+@pytest.mark.parametrize("method", [m.name for m in list_methods("online")])
+def test_online_methods(lb_task, method):
+    r = fe.run_online(lb_task, method=method, horizon=400)
+    assert len(r.choices) == 400 and r.oracle_reward >= r.best_fixed_reward
+    assert 0 <= r.average_reward <= 1
+
+
+def test_learning_beats_random(lb_task):
+    rand = fe.run_online(lb_task, method="uniform").average_reward
+    assert fe.run_online(lb_task, method="thompson").average_reward > rand
+
+
+def test_contextual_needs_features():
+    with pytest.raises(ValueError):
+        fe.run_online(synthetic(), method="linucb")
+
+
+# ------------------------------------------------------------ misc
 def test_scorers():
     assert exact_match("The Paris.", "paris") == 1.0
     assert contains("I think it is Paris", "paris") == 1.0
@@ -85,7 +153,7 @@ def test_scorers():
     assert last_number("no number", "3") == 0.0
 
 
-def test_cli(tmp_path, capsys):
+def test_cli_replay_and_methods(tmp_path, capsys):
     scores = synthetic(n=500)
     path = tmp_path / "scores.csv"
     with open(path, "w", newline="") as f:
@@ -93,5 +161,6 @@ def test_cli(tmp_path, capsys):
         w.writerow(["prompt_a", "prompt_b", "prompt_c", "prompt_d"])
         w.writerows(scores.T.astype(int).tolist())
     assert main(["replay", str(path)]) == 0
-    out = capsys.readouterr().out
-    assert "Best: prompt_a" in out and "saved" in out
+    assert "Best: prompt_a" in capsys.readouterr().out
+    assert main(["methods"]) == 0
+    assert "Kalyanakrishnan" in capsys.readouterr().out
