@@ -10,6 +10,8 @@ Every method on the same real data: per-question results of 395 models from the 
 |---|---|---|---|---|---|---|
 | `lucb` | fixed confidence | 65% saved, 100% right | 21% saved, 100% right | 11% saved, 100% right | 30% saved, 100% right | **32%** |
 | `successive_elimination` | fixed confidence | 65% saved, 100% right | 21% saved, 100% right | 11% saved, 100% right | 30% saved, 100% right | **32%** |
+| `track_and_stop` | fixed confidence | 47% saved, 100% right | 12% saved, 100% right | 6% saved, 100% right | 23% saved, 100% right | **22%** |
+| `eb_tc` | fixed confidence | 55% saved, 100% right | 8% saved, 100% right | 4% saved, 100% right | 14% saved, 100% right | **21%** |
 | `lil_ucb` | fixed confidence | 47% saved, 100% right | 8% saved, 100% right | 5% saved, 100% right | 13% saved, 100% right | **18%** |
 | `top_two_ts` | fixed confidence | 24% saved, 100% right | 7% saved, 100% right | 3% saved, 100% right | 14% saved, 100% right | **12%** |
 | `uniform` | baseline | 14% saved, 100% right | 2% saved, 100% right | 1% saved, 100% right | 8% saved, 100% right | **6%** |

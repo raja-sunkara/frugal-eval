@@ -1,0 +1,92 @@
+{
+ "identify": {
+  "uniform": {
+   "kind": "baseline",
+   "value": 6.1
+  },
+  "lucb": {
+   "kind": "fixed confidence",
+   "value": 32.0
+  },
+  "successive_elimination": {
+   "kind": "fixed confidence",
+   "value": 31.8
+  },
+  "lil_ucb": {
+   "kind": "fixed confidence",
+   "value": 18.2
+  },
+  "top_two_ts": {
+   "kind": "fixed confidence",
+   "value": 11.7
+  },
+  "track_and_stop": {
+   "kind": "fixed confidence",
+   "value": 21.9
+  },
+  "eb_tc": {
+   "kind": "fixed confidence",
+   "value": 20.5
+  },
+  "successive_halving": {
+   "kind": "fixed budget",
+   "value": 70.1
+  },
+  "successive_rejects": {
+   "kind": "fixed budget",
+   "value": 70.0
+  }
+ },
+ "estimate": {
+  "random": {
+   "kind": "baseline",
+   "value": 3.3
+  },
+  "stratified": {
+   "kind": "classical",
+   "value": 2.2
+  },
+  "anchor_points": {
+   "kind": "representative subset",
+   "value": 2.3
+  },
+  "irt": {
+   "kind": "model-based",
+   "value": 1.7
+  }
+ },
+ "online": {
+  "uniform": {
+   "kind": "baseline",
+   "value": 75.5
+  },
+  "epsilon_greedy": {
+   "kind": "non-contextual",
+   "value": 93.4
+  },
+  "ucb1": {
+   "kind": "non-contextual",
+   "value": 87.0
+  },
+  "kl_ucb": {
+   "kind": "non-contextual",
+   "value": 92.4
+  },
+  "thompson": {
+   "kind": "non-contextual",
+   "value": 93.8
+  },
+  "exp3": {
+   "kind": "adversarial",
+   "value": 85.1
+  },
+  "linucb": {
+   "kind": "contextual",
+   "value": 101.3
+  },
+  "lin_ts": {
+   "kind": "contextual",
+   "value": 102.0
+  }
+ }
+}

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frugal-eval"
-version = "0.2.0"
+version = "0.3.0"
 description = "Methods from the research literature for cheaper LLM evaluation and online model selection."
 readme = "README.md"
 license = { text = "MIT" }

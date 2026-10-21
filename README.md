@@ -8,7 +8,7 @@
 
 Evaluating LLMs is expensive: 10 prompts on a 1,000-question test set is 10,000 calls. A lot of that work is wasted, and the bandits, active testing and psychometrics literature has good methods for not wasting it. They are scattered across papers, each with its own code. frugal-eval puts them behind one interface and ranks them on the same real data.
 
-It covers three problems:
+It covers three problems, with 21 methods so far:
 
 | Problem | Question it answers | Example |
 |---|---|---|
@@ -94,6 +94,8 @@ Already have scores? `fe.identify(scores_array)` or `frugal-eval replay scores.c
 | Find the best | `successive_elimination` | fixed confidence | [Even-Dar, Mannor & Mansour (JMLR 2006)](https://www.jmlr.org/papers/volume7/evendar06a/evendar06a.pdf) | Evaluate all surviving candidates in rounds; drop any that is confidently worse than the leader. |
 | Find the best | `lil_ucb` | fixed confidence | [Jamieson, Malloy, Nowak & Bubeck (COLT 2014)](https://proceedings.mlr.press/v35/jamieson14.pdf) | Evaluate the candidate with the highest law-of-the-iterated-logarithm UCB index. |
 | Find the best | `top_two_ts` | fixed confidence | [Russo (COLT 2016; Operations Research 2020), Top-Two Thompson Sampling](https://arxiv.org/abs/1602.08448) | Sample a leader from the posterior; with probability 1 - beta evaluate a re-sampled challenger instead. |
+| Find the best | `track_and_stop` | fixed confidence | [Garivier & Kaufmann (COLT 2016), Track-and-Stop](https://proceedings.mlr.press/v49/garivier16a.html) | Track the asymptotically optimal share of evaluations per candidate, computed from current estimates. |
+| Find the best | `eb_tc` | fixed confidence | [Jourdan, Degenne & Kaufmann (NeurIPS 2023), EB-TC](https://arxiv.org/abs/2305.16041) | Top-two method: the empirical best is the leader, the challenger minimises the transportation cost. |
 | Find the best | `successive_halving` | fixed budget | [Karnin, Koren & Somekh (ICML 2013)](https://proceedings.mlr.press/v28/karnin13.pdf) | Split the budget into rounds; after each round keep the better half. |
 | Find the best | `successive_rejects` | fixed budget | [Audibert, Bubeck & Munos (COLT 2010)](https://www.learningtheory.org/colt2010/papers/59Audibert.pdf) | Run K-1 phases of growing length; reject the worst candidate after each phase. |
 | Estimate scores | `random` | baseline | Baseline | Run a uniformly random subset and report the plain average. |
@@ -110,6 +112,11 @@ Already have scores? `fe.identify(scores_array)` or `frugal-eval replay scores.c
 | Online selection | `lin_ts` | contextual | [Agrawal & Goyal (ICML 2013), Thompson sampling for contextual bandits](https://proceedings.mlr.press/v28/agrawal13.pdf) | Linear Thompson sampling: sample each candidate's regression weights, route to the best sampled score. |
 
 ## Benchmarks
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmark-dark.png">
+  <img alt="Benchmark of every method on real Open LLM Leaderboard results" src="docs/benchmark.png">
+</picture>
 
 Real per-question results of 395 Open LLM Leaderboard models; 10 random models per trial, 20 trials on each of GSM8K, ARC-Challenge, Winogrande and TruthfulQA. Every method sees exactly the same problems.
 
@@ -147,7 +154,7 @@ All candidates go through the test set in the same random order, and comparisons
 
 Planned additions, all from published work:
 
-- Track-and-Stop (Garivier & Kaufmann, COLT 2016) and Top-Two UCB (Jourdan & Degenne, 2022)
+- Top-Two UCB (Jourdan & Degenne, NeurIPS 2023) and other recent top-two methods
 - Confidence sequences for sampling without replacement (Waudby-Smith & Ramdas, NeurIPS 2020)
 - Low-rank evaluation acceleration (Zhou et al., ICLR 2025) and model-similarity methods (SySRs, ICML 2026)
 - gp-IRT and more estimators from tinyBenchmarks (Polo et al., ICML 2024)

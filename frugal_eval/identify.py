@@ -340,6 +340,121 @@ def run_top_two_ts(ev: Evaluation, budget: int | None = None, warmup: int = 10, 
         _pull_paired(ev, h, arm) if arm != h else ev.pull([arm])
 
 
+def _kl(p: np.ndarray | float, q: np.ndarray | float) -> np.ndarray:
+    p = np.clip(p, 1e-9, 1 - 1e-9)
+    q = np.clip(q, 1e-9, 1 - 1e-9)
+    return p * np.log(p / q) + (1 - p) * np.log((1 - p) / (1 - q))
+
+
+def optimal_weights(mu: np.ndarray, iters: int = 40) -> np.ndarray:
+    """Optimal proportions w*(mu) for Bernoulli best-arm identification (Garivier & Kaufmann, 2016, Thm 5).
+
+    Solves F(y) = 1 by bisection on y; for each y, every x_a(y) is found by a vectorised bisection.
+    """
+    K = len(mu)
+    mu = np.clip(np.asarray(mu, dtype=float), 1e-4, 1 - 1e-4)
+    best = int(np.argmax(mu))
+    m1 = mu[best]
+    mo = np.delete(mu, best)
+    mo = np.minimum(mo, m1 - 1e-6)  # ties: treat challengers as marginally worse
+
+    def g(x: np.ndarray) -> np.ndarray:
+        m = (m1 + x * mo) / (1 + x)
+        return _kl(m1, m) + x * _kl(mo, m)
+
+    def x_of_y(y: float) -> np.ndarray:
+        lo, hi = np.zeros_like(mo), np.ones_like(mo)
+        for _ in range(60):  # grow the bracket until g(hi) >= y
+            short = g(hi) < y
+            if not short.any():
+                break
+            hi = np.where(short, hi * 2, hi)
+        for _ in range(iters):
+            mid = (lo + hi) / 2
+            below = g(mid) < y
+            lo, hi = np.where(below, mid, lo), np.where(below, hi, mid)
+        return (lo + hi) / 2
+
+    def F(y: float) -> tuple[float, np.ndarray]:
+        x = x_of_y(y)
+        m = (m1 + x * mo) / (1 + x)
+        return float(np.sum(_kl(m1, m) / np.maximum(_kl(mo, m), 1e-300))), x
+
+    lo, hi = 0.0, float(_kl(m1, mo).min()) * (1 - 1e-9)
+    for _ in range(iters):
+        mid = (lo + hi) / 2
+        val, _ = F(mid)
+        lo, hi = (mid, hi) if val < 1 else (lo, mid)
+    _, x = F((lo + hi) / 2)
+    w = np.insert(x, best, 1.0)
+    return w / w.sum()
+
+
+@register("identify", "track_and_stop", kind="fixed confidence",
+          paper="Garivier & Kaufmann (COLT 2016), Track-and-Stop",
+          url="https://proceedings.mlr.press/v49/garivier16a.html",
+          summary="Track the asymptotically optimal share of evaluations per candidate, computed from current estimates.")
+def run_track_and_stop(ev: Evaluation, budget: int | None = None, warmup: int = 10, update_every: int = 20,
+                       **_: Any) -> Result:
+    """D-tracking with forced exploration. Optimal weights use the Bernoulli model. To keep it fast they
+    are recomputed after every ``update_every`` evaluations or 2% growth in the total, whichever is
+    larger (the paper recomputes them at every step).
+    """
+    _warm_start(ev, max(1, warmup // 2))
+    w = optimal_weights(ev.means)
+    last_update = int(ev.n.sum())
+    while True:
+        out = _check(ev, budget, "track_and_stop")
+        if out:
+            return out
+        avail = ev.available()
+        t = int(ev.n.sum())
+        starved = np.flatnonzero(avail & (ev.n < math.sqrt(t) - ev.K / 2))
+        if starved.size:
+            arm = int(starved[np.argmin(ev.n[starved])])
+        else:
+            if t - last_update >= max(update_every, int(0.02 * last_update)):
+                w = optimal_weights(ev.means)
+                last_update = t
+            gap = t * w - ev.n
+            gap[~avail] = -np.inf
+            arm = int(np.argmax(gap))
+        h = int(np.argmax(ev.means))
+        _pull_paired(ev, h, arm) if arm != h else ev.pull([arm])
+
+
+@register("identify", "eb_tc", kind="fixed confidence",
+          paper="Jourdan, Degenne & Kaufmann (NeurIPS 2023), EB-TC",
+          url="https://arxiv.org/abs/2305.16041",
+          summary="Top-two method: the empirical best is the leader, the challenger minimises the transportation cost.")
+def run_eb_tc(ev: Evaluation, budget: int | None = None, warmup: int = 10, beta: float = 0.5,
+              slack: float = 0.0, **_: Any) -> Result:
+    """EB-TC with fixed-design tracking (beta = 1/2) and Gaussian transportation costs.
+
+    ``slack`` is the epsilon_0 of EB-TC-epsilon; the default 0 is plain EB-TC.
+    """
+    _warm_start(ev, max(1, warmup // 2))
+    led = np.zeros(ev.K)        # times each candidate was the leader
+    led_pulled = np.zeros(ev.K)  # times it was the leader and was evaluated
+    while True:
+        out = _check(ev, budget, "eb_tc")
+        if out:
+            return out
+        mu, n = ev.means, np.maximum(ev.n, 1)
+        b = int(np.argmax(mu))
+        cost = (mu[b] - mu + slack) / np.sqrt(1 / n[b] + 1 / n)
+        cost[b] = np.inf
+        cost[~ev.available()] = np.inf
+        c = int(np.argmin(cost)) if np.isfinite(cost).any() else b
+        led[b] += 1
+        if (led_pulled[b] <= beta * led[b] and ev.n[b] < ev.N) or c == b:
+            led_pulled[b] += 1
+            arm = b
+        else:
+            arm = c
+        _pull_paired(ev, b, arm) if arm != b else ev.pull([arm])
+
+
 # ======================================================================
 # fixed-budget methods (spend the budget, then return the best guess)
 # ======================================================================
@@ -431,5 +546,5 @@ def find_best(scores: Any = None, *, candidates: Sequence[Any] | None = None, ex
     return identify(scores, method=algorithm, names=names, **kwargs)
 
 
-ALGORITHMS = ("uniform", "lucb", "successive_elimination", "lil_ucb", "top_two_ts",
+ALGORITHMS = ("uniform", "lucb", "successive_elimination", "lil_ucb", "top_two_ts", "track_and_stop", "eb_tc",
               "successive_halving", "successive_rejects")
