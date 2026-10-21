@@ -1,0 +1,2 @@
+[console_scripts]
+frugal-eval = frugal_eval.cli:main
