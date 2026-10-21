@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frugal-eval"
+version = "0.1.0"
+description = "Find your best prompt or model with fewer evaluation calls, with a statistical guarantee."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Raja Sunkara" }]
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.23", "httpx>=0.24"]
+keywords = ["llm", "evaluation", "bandits", "best-arm identification", "prompt engineering"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+frugal-eval = "frugal_eval.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/raja-sunkara/frugal-eval"
+
+[tool.setuptools]
+packages = ["frugal_eval"]
