@@ -112,7 +112,7 @@ Algorithms: `lucb` (default), `uniform` (same stopping rule, no adaptive samplin
 
 ## Roadmap
 
-- Paired comparisons between candidates, for bigger savings when candidates are close
+- More methods from recent papers, ranked on a shared benchmark
 - Integrations with promptfoo, Inspect and lm-evaluation-harness
 - Async live evaluation
 - Hosted dashboard for teams

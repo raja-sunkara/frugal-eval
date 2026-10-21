@@ -100,6 +100,11 @@ class Evaluation:
         self.s2 = np.zeros(self.K)
         # X[k, t] = score of candidate k on the t-th example of the shared order
         self.X = np.zeros((self.K, self.N))
+        # running paired statistics on the examples both k and j have seen:
+        # M[k, j] = count, D[k, j] = sum of (x_k - x_j), D2[k, j] = sum of (x_k - x_j)^2
+        self.M = np.zeros((self.K, self.K))
+        self.D = np.zeros((self.K, self.K))
+        self.D2 = np.zeros((self.K, self.K))
         self.record_history = record_history
         self.history: list[tuple[int, int]] = []
 
@@ -119,7 +124,18 @@ class Evaluation:
         if not pairs:
             return
         for (k, _), x in zip(pairs, self.source.score_many(pairs)):
-            self.X[k, self.n[k]] = x
+            t = self.n[k]
+            self.X[k, t] = x
+            ahead = self.n > t  # candidates that have already seen this example
+            ahead[k] = False
+            if ahead.any():
+                d = x - self.X[ahead, t]
+                self.M[k, ahead] += 1
+                self.M[ahead, k] += 1
+                self.D[k, ahead] += d
+                self.D[ahead, k] -= d
+                self.D2[k, ahead] += d * d
+                self.D2[ahead, k] += d * d
             self.n[k] += 1
             self.s[k] += x
             self.s2[k] += x * x
@@ -146,20 +162,19 @@ class Evaluation:
         easy questions right, the paired difference is far less noisy than the
         two scores separately, which is where most of the savings come from.
         """
+        n = self.M[h].copy()
+        seen = n > 0
+        seen[h] = False
         diff = np.zeros(self.K)
         rad = np.full(self.K, np.inf)
-        for j in range(self.K):
-            if j == h:
-                rad[j] = 0.0
-                continue
-            n = int(min(self.n[h], self.n[j]))
-            if n == 0:
-                continue
-            d = (self.X[h, :n] - self.X[j, :n] + 1.0) / 2.0  # rescale [-1, 1] -> [0, 1]
-            r = radius(np.array([n]), np.array([d.sum()]), np.array([d @ d]),
-                       self.N, self.K * self.K, self.delta)[0]
-            diff[j] = 2.0 * d.mean() - 1.0
-            rad[j] = 2.0 * r
+        rad[h] = 0.0
+        if seen.any():
+            ns, dsum, d2 = n[seen], self.D[h, seen], self.D2[h, seen]
+            # rescale differences from [-1, 1] to [0, 1]: d' = (d + 1) / 2
+            s1 = (dsum + ns) / 2.0
+            s2 = (d2 + 2.0 * dsum + ns) / 4.0
+            diff[seen] = dsum / ns
+            rad[seen] = 2.0 * radius(ns, s1, s2, self.N, self.K * self.K, self.delta)
         return diff, rad
 
     def leader_and_challenger(self) -> tuple[int, int]:
