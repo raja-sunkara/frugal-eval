@@ -148,21 +148,21 @@ Every method, its headline number on the shared benchmarks (updated automaticall
 | Estimate scores | `stratified` | classical | **2.2** pts error from 100 questions | [Stratified sampling (Neyman, 1934), as used in efficient-benchmarking work](https://doi.org/10.2307/2342192) |
 | Estimate scores | `anchor_points` | representative subset | **2.1** pts error from 100 questions | [Vivek, Ethayarajh, Yang & Kiela (EACL 2024), Anchor Points](https://arxiv.org/abs/2309.08638) |
 | Estimate scores | `irt` | model-based | **1.7** pts error from 100 questions | [Polo, Weber, Choshen, Sun, Xu & Yurochkin (ICML 2024), tinyBenchmarks (p-IRT)](https://arxiv.org/abs/2402.14992) |
-| Online selection | `uniform` | baseline | **79%** of best model; RouterBench: 66% quality at 25% cost | Baseline |
-| Online selection | `epsilon_greedy` | non-contextual | **95%** of best model; RouterBench: 93% quality at 68% cost | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002), epsilon_n-greedy](https://doi.org/10.1023/A:1013689704352) |
-| Online selection | `ucb1` | non-contextual | **90%** of best model; RouterBench: 82% quality at 25% cost | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002)](https://doi.org/10.1023/A:1013689704352) |
-| Online selection | `kl_ucb` | non-contextual | **94%** of best model; RouterBench: 84% quality at 17% cost | [Garivier & Cappé (COLT 2011)](https://proceedings.mlr.press/v19/garivier11a/garivier11a.pdf) |
-| Online selection | `thompson` | non-contextual | **95%** of best model; RouterBench: 84% quality at 15% cost | [Agrawal & Goyal (COLT 2012); Thompson (1933)](https://proceedings.mlr.press/v23/agrawal12/agrawal12.pdf) |
-| Online selection | `exp3` | adversarial | **88%** of best model; RouterBench: 82% quality at 32% cost | [Auer, Cesa-Bianchi, Freund & Schapire (SIAM J. Computing 2002)](https://doi.org/10.1137/S0097539701398375) |
+| Online selection | `uniform` | baseline | **79%** of best model; RouterBench: 66% quality at 25% cost; drift: 72% | Baseline |
+| Online selection | `epsilon_greedy` | non-contextual | **95%** of best model; RouterBench: 89% quality at 43% cost; drift: 90% | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002), epsilon_n-greedy](https://doi.org/10.1023/A:1013689704352) |
+| Online selection | `ucb1` | non-contextual | **90%** of best model; RouterBench: 82% quality at 25% cost; drift: 89% | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002)](https://doi.org/10.1023/A:1013689704352) |
+| Online selection | `kl_ucb` | non-contextual | **94%** of best model; RouterBench: 84% quality at 18% cost; drift: 94% | [Garivier & Cappé (COLT 2011)](https://proceedings.mlr.press/v19/garivier11a/garivier11a.pdf) |
+| Online selection | `thompson` | non-contextual | **95%** of best model; RouterBench: 83% quality at 13% cost; drift: 93% | [Agrawal & Goyal (COLT 2012); Thompson (1933)](https://proceedings.mlr.press/v23/agrawal12/agrawal12.pdf) |
+| Online selection | `exp3` | adversarial | **88%** of best model; RouterBench: 82% quality at 28% cost; drift: 86% | [Auer, Cesa-Bianchi, Freund & Schapire (SIAM J. Computing 2002)](https://doi.org/10.1137/S0097539701398375) |
 | Online selection | `linucb` | contextual | **103%** of best model; RouterBench: 94% quality at 23% cost | [Li, Chu, Langford & Schapire (WWW 2010)](https://arxiv.org/abs/1003.0146) |
-| Online selection | `lin_ts` | contextual | **103%** of best model; RouterBench: 93% quality at 22% cost | [Agrawal & Goyal (ICML 2013), Thompson sampling for contextual bandits](https://proceedings.mlr.press/v28/agrawal13.pdf) |
-| Online selection | `discounted_ucb` | non-stationary | - | [Garivier & Moulines (ALT 2011), Discounted UCB](https://arxiv.org/abs/0805.3415) |
-| Online selection | `sliding_window_ucb` | non-stationary | - | [Garivier & Moulines (ALT 2011), Sliding-Window UCB](https://arxiv.org/abs/0805.3415) |
-| Online selection | `discounted_thompson` | non-stationary | - | [Raj & Kalyani (2017), Discounted Thompson Sampling](https://arxiv.org/abs/1707.09727) |
-| Pairwise | `round_robin` | baseline | - | Baseline |
-| Pairwise | `borda_lucb` | fixed confidence | - | [Jamieson, Katariya, Deshpande & Nowak (AISTATS 2015), Borda reduction; with LUCB](https://proceedings.mlr.press/v38/jamieson15.html) |
-| Pairwise | `borda_elimination` | fixed confidence | - | [Jamieson, Katariya, Deshpande & Nowak (AISTATS 2015), Borda reduction; with successive elimination](https://proceedings.mlr.press/v38/jamieson15.html) |
-| Pairwise | `savage` | fixed confidence | - | [Urvoy, Clerot, Féraud & Naamane (ICML 2013), SAVAGE](https://proceedings.mlr.press/v28/urvoy13.html) |
+| Online selection | `lin_ts` | contextual | **103%** of best model; RouterBench: 93% quality at 23% cost | [Agrawal & Goyal (ICML 2013), Thompson sampling for contextual bandits](https://proceedings.mlr.press/v28/agrawal13.pdf) |
+| Online selection | `discounted_ucb` | non-stationary | **86%** of best model; RouterBench: 73% quality at 29% cost; drift: 83% | [Garivier & Moulines (ALT 2011), Discounted UCB](https://arxiv.org/abs/0805.3415) |
+| Online selection | `sliding_window_ucb` | non-stationary | **92%** of best model; RouterBench: 79% quality at 29% cost; drift: 92% | [Garivier & Moulines (ALT 2011), Sliding-Window UCB](https://arxiv.org/abs/0805.3415) |
+| Online selection | `discounted_thompson` | non-stationary | **94%** of best model; RouterBench: 81% quality at 28% cost; drift: 92% | [Raj & Kalyani (2017), Discounted Thompson Sampling](https://arxiv.org/abs/1707.09727) |
+| Pairwise | `round_robin` | baseline | **70,530** votes to certify; 85% right at 1,000, 80% right at 5,000 | Baseline |
+| Pairwise | `borda_lucb` | fixed confidence | **43,706** votes to certify; 75% right at 1,000, 80% right at 5,000 | [Jamieson, Katariya, Deshpande & Nowak (AISTATS 2015), Borda reduction; with LUCB](https://proceedings.mlr.press/v38/jamieson15.html) |
+| Pairwise | `borda_elimination` | fixed confidence | **44,968** votes to certify; 75% right at 1,000, 80% right at 5,000 | [Jamieson, Katariya, Deshpande & Nowak (AISTATS 2015), Borda reduction; with successive elimination](https://proceedings.mlr.press/v38/jamieson15.html) |
+| Pairwise | `savage` | fixed confidence | **300,000** votes to certify; 85% right at 1,000, 90% right at 5,000 | [Urvoy, Clerot, Féraud & Naamane (ICML 2013), SAVAGE](https://proceedings.mlr.press/v28/urvoy13.html) |
 <!-- ZOO:END -->
 
 <details>

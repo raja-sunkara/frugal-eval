@@ -1,92 +1,104 @@
 {
  "identify": {
   "uniform": {
-   "kind": "baseline",
-   "value": 9.7
+   "value": 9.7,
+   "kind": "baseline"
   },
   "lucb": {
-   "kind": "fixed confidence",
-   "value": 38.3
+   "value": 38.3,
+   "kind": "fixed confidence"
   },
   "successive_elimination": {
-   "kind": "fixed confidence",
-   "value": 38.2
+   "value": 38.2,
+   "kind": "fixed confidence"
   },
   "lil_ucb": {
-   "kind": "fixed confidence",
-   "value": 18.8
+   "value": 18.8,
+   "kind": "fixed confidence"
   },
   "top_two_ts": {
-   "kind": "fixed confidence",
-   "value": 15.1
+   "value": 15.1,
+   "kind": "fixed confidence"
   },
   "track_and_stop": {
-   "kind": "fixed confidence",
-   "value": 26.8
+   "value": 26.8,
+   "kind": "fixed confidence"
   },
   "eb_tc": {
-   "kind": "fixed confidence",
-   "value": 26.2
+   "value": 26.2,
+   "kind": "fixed confidence"
   },
   "successive_halving": {
-   "kind": "fixed budget",
-   "value": 70.1
+   "value": 70.1,
+   "kind": "fixed budget"
   },
   "successive_rejects": {
-   "kind": "fixed budget",
-   "value": 70.0
+   "value": 70.0,
+   "kind": "fixed budget"
   }
  },
  "estimate": {
   "random": {
-   "kind": "baseline",
-   "value": 3.2
+   "value": 3.2,
+   "kind": "baseline"
   },
   "stratified": {
-   "kind": "classical",
-   "value": 2.2
+   "value": 2.2,
+   "kind": "classical"
   },
   "anchor_points": {
-   "kind": "representative subset",
-   "value": 2.1
+   "value": 2.1,
+   "kind": "representative subset"
   },
   "irt": {
-   "kind": "model-based",
-   "value": 1.7
+   "value": 1.7,
+   "kind": "model-based"
   }
  },
  "online": {
   "uniform": {
-   "kind": "baseline",
-   "value": 79.3
+   "value": 79.3,
+   "kind": "baseline"
   },
   "epsilon_greedy": {
-   "kind": "non-contextual",
-   "value": 95.3
+   "value": 95.3,
+   "kind": "non-contextual"
   },
   "ucb1": {
-   "kind": "non-contextual",
-   "value": 89.8
+   "value": 89.8,
+   "kind": "non-contextual"
   },
   "kl_ucb": {
-   "kind": "non-contextual",
-   "value": 94.3
+   "value": 94.3,
+   "kind": "non-contextual"
   },
   "thompson": {
-   "kind": "non-contextual",
-   "value": 95.4
+   "value": 95.4,
+   "kind": "non-contextual"
   },
   "exp3": {
-   "kind": "adversarial",
-   "value": 88.2
+   "value": 88.2,
+   "kind": "adversarial"
   },
   "linucb": {
-   "kind": "contextual",
-   "value": 102.8
+   "value": 102.8,
+   "kind": "contextual"
   },
   "lin_ts": {
-   "kind": "contextual",
-   "value": 103.4
+   "value": 103.4,
+   "kind": "contextual"
+  },
+  "discounted_ucb": {
+   "value": 86.3,
+   "kind": "non-stationary"
+  },
+  "sliding_window_ucb": {
+   "value": 92.4,
+   "kind": "non-stationary"
+  },
+  "discounted_thompson": {
+   "value": 93.5,
+   "kind": "non-stationary"
   }
  },
  "_meta": {
@@ -103,51 +115,141 @@
  "routing": {
   "uniform": {
    "quality": 66.4,
-   "cost": 25.4,
+   "cost": 25.2,
    "setting": "cost weight 0.5",
    "kind": "baseline"
   },
   "epsilon_greedy": {
-   "quality": 92.6,
-   "cost": 68.1,
+   "quality": 88.6,
+   "cost": 43.3,
    "setting": "cost weight 0.5",
    "kind": "non-contextual"
   },
   "ucb1": {
-   "quality": 82.2,
-   "cost": 24.8,
+   "quality": 81.9,
+   "cost": 24.7,
    "setting": "cost weight 0.5",
    "kind": "non-contextual"
   },
   "kl_ucb": {
-   "quality": 83.5,
-   "cost": 17.1,
+   "quality": 83.6,
+   "cost": 17.8,
    "setting": "cost weight 0.5",
    "kind": "non-contextual"
   },
   "thompson": {
-   "quality": 83.7,
-   "cost": 15.4,
+   "quality": 83.2,
+   "cost": 13.0,
    "setting": "cost weight 0.5",
    "kind": "non-contextual"
   },
   "exp3": {
-   "quality": 82.2,
-   "cost": 31.8,
+   "quality": 81.5,
+   "cost": 27.8,
    "setting": "cost weight 0.5",
    "kind": "adversarial"
   },
   "linucb": {
-   "quality": 94.3,
-   "cost": 23.0,
+   "quality": 94.4,
+   "cost": 22.8,
    "setting": "cost weight 0.5",
    "kind": "contextual"
   },
   "lin_ts": {
-   "quality": 92.7,
-   "cost": 22.1,
+   "quality": 93.3,
+   "cost": 22.8,
    "setting": "cost weight 0.5",
    "kind": "contextual"
+  },
+  "discounted_ucb": {
+   "quality": 73.4,
+   "cost": 28.6,
+   "setting": "cost weight 0.5",
+   "kind": "non-stationary"
+  },
+  "sliding_window_ucb": {
+   "quality": 79.0,
+   "cost": 29.1,
+   "setting": "cost weight 0.5",
+   "kind": "non-stationary"
+  },
+  "discounted_thompson": {
+   "quality": 80.8,
+   "cost": 28.5,
+   "setting": "cost weight 0.5",
+   "kind": "non-stationary"
+  }
+ },
+ "drift": {
+  "uniform": {
+   "value": 71.8,
+   "kind": "baseline"
+  },
+  "epsilon_greedy": {
+   "value": 90.5,
+   "kind": "non-contextual"
+  },
+  "ucb1": {
+   "value": 88.7,
+   "kind": "non-contextual"
+  },
+  "kl_ucb": {
+   "value": 93.7,
+   "kind": "non-contextual"
+  },
+  "thompson": {
+   "value": 93.0,
+   "kind": "non-contextual"
+  },
+  "exp3": {
+   "value": 85.5,
+   "kind": "adversarial"
+  },
+  "discounted_ucb": {
+   "value": 83.3,
+   "kind": "non-stationary"
+  },
+  "sliding_window_ucb": {
+   "value": 92.0,
+   "kind": "non-stationary"
+  },
+  "discounted_thompson": {
+   "value": 92.5,
+   "kind": "non-stationary"
+  }
+ },
+ "duel": {
+  "round_robin": {
+   "votes": 70530.0,
+   "right_at": {
+    "1000": 85,
+    "5000": 80
+   },
+   "kind": "baseline"
+  },
+  "borda_lucb": {
+   "votes": 43706.0,
+   "right_at": {
+    "1000": 75,
+    "5000": 80
+   },
+   "kind": "fixed confidence"
+  },
+  "borda_elimination": {
+   "votes": 44968.5,
+   "right_at": {
+    "1000": 75,
+    "5000": 80
+   },
+   "kind": "fixed confidence"
+  },
+  "savage": {
+   "votes": 300000.0,
+   "right_at": {
+    "1000": 85,
+    "5000": 90
+   },
+   "kind": "fixed confidence"
   }
  }
 }
