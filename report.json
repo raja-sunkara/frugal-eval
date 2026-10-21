@@ -1,0 +1,23 @@
+{
+ "source": "https://huggingface.co/datasets/withmartian/routerbench",
+ "shape": [
+  11,
+  36497
+ ],
+ "models": [
+  "gpt-3.5-turbo-1106",
+  "claude-instant-v1",
+  "claude-v1",
+  "claude-v2",
+  "gpt-4-1106-preview",
+  "meta/llama-2-70b-chat",
+  "mistralai/mixtral-8x7b-chat",
+  "zero-one-ai/Yi-34B-Chat",
+  "WizardLM/WizardLM-13B-V1.2",
+  "meta/code-llama-instruct-34b-chat",
+  "mistralai/mistral-7b-chat"
+ ],
+ "dropped_rows": 0,
+ "embedding": "all-MiniLM-L6-v2 reduced to 16 dims with PCA",
+ "npz_bytes": 1363391
+}
