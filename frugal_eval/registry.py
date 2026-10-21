@@ -5,6 +5,7 @@ Every method belongs to a *problem*:
 * ``identify``  - find the best candidate with as few calls as possible
 * ``estimate``  - estimate every candidate's full-test-set score from a few examples
 * ``online``    - pick a candidate for each incoming example while learning (regret)
+* ``duel``      - find the best candidate from pairwise comparisons (human or LLM-judge votes)
 
 Add your own method with the ``register`` decorator; it then works everywhere
 (the API, the CLI and the benchmark):
@@ -20,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-PROBLEMS = ("identify", "estimate", "online")
+PROBLEMS = ("identify", "estimate", "online", "duel")
 
 
 @dataclass(frozen=True)
@@ -70,4 +71,4 @@ def list_methods(problem: str | None = None) -> list[MethodInfo]:
 
 def _load_builtin() -> None:
     # importing the modules registers their methods
-    from . import estimate, identify, online  # noqa: F401
+    from . import duel, estimate, identify, online  # noqa: F401

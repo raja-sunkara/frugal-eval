@@ -18,7 +18,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from frugal_eval.bench import DEFAULT_TASKS, routing_markdown, run, run_routing, to_markdown  # noqa: E402
+from frugal_eval.bench import (DEFAULT_TASKS, drift_markdown, duel_markdown, routing_markdown, run,  # noqa: E402
+                               run_drift, run_duel, run_routing, to_markdown)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -36,6 +37,16 @@ INTRO = {
                 "Every prompt arrives once; the method picks one model per prompt and learns from the score it "
                 "gets, penalised by cost times the cost weight. Cells: quality and total cost relative to always "
                 "using the single best model (GPT-4). Contextual methods use a prompt embedding."),
+    "duel": ("Pairwise comparisons on Chatbot Arena",
+             "Real human votes from Chatbot Arena (lmarena-ai/arena-human-preference-55k, Apache-2.0): 8 models "
+             "per trial, either random or the 8 strongest (nearly tied). Each comparison is one simulated vote drawn "
+             "from the real win rate of that pair. Target: the model with the highest average win rate. Cells: "
+             "median votes until a model within 2 points of the best is certified (95% confidence, capped at "
+             "300,000), and how often the pick is exactly right after a fixed number of votes."),
+    "drift": ("Online selection when a model silently degrades",
+              "10 random leaderboard models; questions arrive in order and, halfway through, the best model's "
+              "answers are replaced by those of a model about half as good (a silent model swap behind an "
+              "endpoint). Cells: total score as a share of what the best model of each half would have scored."),
     "online": ("Online selection and routing",
                "10 random leaderboard models; every question in the benchmark arrives once in random order "
                "and the method picks one model per question. Cells: average score and its share of what "
@@ -69,6 +80,10 @@ def main() -> None:
         t0 = time.time()
         if problem == "routing":
             raw[problem] = run_routing(trials=min(args.trials, 5))
+        elif problem == "duel":
+            raw[problem] = run_duel(trials=args.trials)
+        elif problem == "drift":
+            raw[problem] = run_drift(trials=max(3, args.trials // 2))
         else:
             raw[problem] = run(problem, tasks=args.tasks, trials=args.trials)
         print(f"{problem}: {len(raw[problem])} runs in {time.time() - t0:.0f}s", flush=True)
@@ -86,12 +101,13 @@ def main() -> None:
 
 
 def write_reports(raw: dict, trials: int) -> None:
-    order = [p for p in ("identify", "estimate", "online", "routing") if p in raw]
-    tasks = list(dict.fromkeys(r["task"] for p in order if p != "routing" for r in raw[p]))
+    special = {"routing": routing_markdown, "duel": duel_markdown, "drift": drift_markdown}
+    order = [p for p in ("identify", "estimate", "online", "routing", "drift", "duel") if p in raw]
+    tasks = list(dict.fromkeys(r["task"] for p in order if p not in special for r in raw[p]))
     sections = []
     for problem in order:
         title, text = INTRO[problem]
-        table = routing_markdown(raw[problem]) if problem == "routing" else to_markdown(problem, raw[problem])
+        table = special[problem](raw[problem]) if problem in special else to_markdown(problem, raw[problem])
         sections.append(f"## {title}\n\n{text}\n\n{table}\n")
     header = ("# Benchmarks\n\nEvery method on the same real data: per-question results of 395 models from the "
               "Open LLM Leaderboard (via tinyBenchmarks, MIT license). "
@@ -109,29 +125,101 @@ def write_reports(raw: dict, trials: int) -> None:
 
 
 def write_summary(raw: dict, tasks: list | None = None, trials: int | None = None) -> None:
-    """Per-method averages across tasks, used for the README figure."""
+    """Per-method headline numbers: used for the README figure and the method zoo table."""
     from frugal_eval.bench import summarize
     from frugal_eval.registry import list_methods
 
-    metric = {"identify": ("savings", 100), "estimate": ("mae", 100), "online": (None, 100)}
-    out = {}
+    metric = {"identify": "savings", "estimate": "mae"}
+    path = os.path.join(ROOT, "benchmarks", "summary.json")
+    try:  # keep sections that this run did not recompute
+        with open(path) as f:
+            out = json.load(f)
+    except (OSError, ValueError):
+        out = {}
     for problem, rows in raw.items():
-        if problem == "routing":
-            continue
+        kinds = {m.name: m.kind for m in list_methods("online" if problem in ("routing", "drift") else problem)}
+        methods = list(dict.fromkeys(r["method"] for r in rows))
         s = summarize(rows)
-        kinds = {m.name: m.kind for m in list_methods(problem)}
-        methods = dict.fromkeys(r["method"] for r in rows)
-        tasks = list(dict.fromkeys(r["task"] for r in rows))
+        settings = list(dict.fromkeys(r["task"] for r in rows))
         out[problem] = {}
         for m in methods:
             if problem == "online":
-                v = np.mean([s[(m, t)]["avg"] / s[(m, t)]["best_fixed"] for t in tasks])
-            else:
-                v = np.mean([s[(m, t)][metric[problem][0]] for t in tasks])
-            out[problem][m] = {"kind": kinds[m], "value": round(float(v) * 100, 1)}
-    out["_meta"] = {"tasks": tasks, "trials": trials}
-    with open(os.path.join(ROOT, "benchmarks", "summary.json"), "w") as f:
+                v = np.mean([s[(m, t)]["avg"] / s[(m, t)]["best_fixed"] for t in settings]) * 100
+                entry = {"value": round(float(v), 1)}
+            elif problem in metric:
+                v = np.mean([s[(m, t)][metric[problem]] for t in settings]) * 100
+                entry = {"value": round(float(v), 1)}
+            elif problem == "routing":
+                key = "cost weight 0.5" if (m, "cost weight 0.5") in s else settings[-1]
+                entry = {"quality": round(s[(m, key)]["score_vs_best"] * 100, 1),
+                         "cost": round(s[(m, key)]["cost_vs_best"] * 100, 1), "setting": key}
+            elif problem == "drift":
+                entry = {"value": round(float(np.mean([s[(m, t)]["vs_piecewise"] for t in settings])) * 100, 1)}
+            else:  # duel
+                rs = [r for r in rows if r["method"] == m and r["task"] == "arena/random"]
+                budgets = sorted(int(k.split("_")[-1]) for k in rs[0] if k.startswith("right_at_"))
+                entry = {"votes": float(np.median([r["comparisons"] for r in rs])),
+                         "right_at": {str(n): round(float(np.mean([r[f"right_at_{n}"] for r in rs])) * 100)
+                                      for n in budgets}}
+            entry["kind"] = kinds.get(m, "")
+            out[problem][m] = entry
+    if tasks:
+        out["_meta"] = {"tasks": tasks, "trials": trials}
+    with open(path, "w") as f:
         json.dump(out, f, indent=1)
+    update_readme_zoo(out)
+
+
+def zoo_markdown(summary: dict) -> str:
+    """The README method zoo: every method, its key number on the shared benchmarks, and its paper."""
+    from frugal_eval.registry import list_methods
+
+    rows = ["| Problem | Method | Type | Headline result | Paper |", "|---|---|---|---|---|"]
+
+    def paper(m):
+        return f"[{m.paper}]({m.url})" if m.url else m.paper
+
+    for m in list_methods("identify"):
+        v = summary.get("identify", {}).get(m.name)
+        res = "-" if v is None else (f"{v['value']:.0f}% of calls (preset budget)" if m.kind == "fixed budget"
+                                     else f"**{v['value']:.0f}%** fewer calls, certified")
+        rows.append(f"| Find the best | `{m.name}` | {m.kind} | {res} | {paper(m)} |")
+    for m in list_methods("estimate"):
+        v = summary.get("estimate", {}).get(m.name)
+        res = "-" if v is None else f"**{v['value']:.1f}** pts error from 100 questions"
+        rows.append(f"| Estimate scores | `{m.name}` | {m.kind} | {res} | {paper(m)} |")
+    for m in list_methods("online"):
+        parts = []
+        if m.name in summary.get("online", {}):
+            parts.append(f"**{summary['online'][m.name]['value']:.0f}%** of best model")
+        if m.name in summary.get("routing", {}):
+            r = summary["routing"][m.name]
+            parts.append(f"RouterBench: {r['quality']:.0f}% quality at {r['cost']:.0f}% cost")
+        if m.name in summary.get("drift", {}):
+            parts.append(f"drift: {summary['drift'][m.name]['value']:.0f}%")
+        rows.append(f"| Online selection | `{m.name}` | {m.kind} | {'; '.join(parts) or '-'} | {paper(m)} |")
+    for m in list_methods("duel"):
+        v = summary.get("duel", {}).get(m.name)
+        if v is None:
+            res = "-"
+        else:
+            right = ", ".join(f"{p}% right at {int(n):,}" for n, p in v["right_at"].items())
+            res = f"**{v['votes']:,.0f}** votes to certify; {right}"
+        rows.append(f"| Pairwise | `{m.name}` | {m.kind} | {res} | {paper(m)} |")
+    return "\n".join(rows)
+
+
+def update_readme_zoo(summary: dict) -> None:
+    path = os.path.join(ROOT, "README.md")
+    with open(path) as f:
+        text = f.read()
+    start, end = "<!-- ZOO:START -->", "<!-- ZOO:END -->"
+    if start in text and end in text:
+        a, b = text.index(start) + len(start), text.index(end)
+        text = text[:a] + "\n" + zoo_markdown(summary) + "\n" + text[b:]
+        with open(path, "w") as f:
+            f.write(text)
+        print("updated the README method zoo")
 
 
 if __name__ == "__main__":

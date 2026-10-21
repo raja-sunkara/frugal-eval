@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use frugal-eval, please cite it as below, and cite the papers of the methods you use."
+title: "frugal-eval: methods for cheaper LLM evaluation and online model selection"
+authors:
+  - family-names: Sunkara
+    given-names: Raja
+type: software
+license: MIT
+repository-code: "https://github.com/raja-sunkara/frugal-eval"
+version: 0.5.0
+date-released: 2026-10-21
+keywords:
+  - LLM evaluation
+  - multi-armed bandits
+  - best-arm identification
+  - dueling bandits
+  - item response theory
+  - model routing

@@ -1,0 +1,28 @@
+name: Method or benchmark request
+description: Suggest a method from a paper, or a dataset to benchmark on
+labels: ["method request"]
+body:
+  - type: input
+    id: paper
+    attributes:
+      label: Paper
+      description: Title, authors, venue and a link
+    validations:
+      required: true
+  - type: dropdown
+    id: problem
+    attributes:
+      label: Problem
+      options:
+        - Find the best (identify)
+        - Estimate scores (estimate)
+        - Online selection / routing (run_online)
+        - Pairwise comparisons (duel)
+        - New problem or benchmark data
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is useful
+      description: What it does better than the methods already in frugal-eval, and any reference code

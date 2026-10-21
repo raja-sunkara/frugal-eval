@@ -65,6 +65,10 @@ class OnlineResult:
             T = len(self.choices)
             lines.append(f"Best single candidate would average {self.best_fixed_reward / T:.3f} (objective); "
                          f"regret {self.regret:.1f} ({self.regret / T:+.3f} per request)")
+        if self.extra.get("best_piecewise_reward") is not None:
+            pw = self.extra["best_piecewise_reward"]
+            lines.append(f"Best model of each segment (between changes) would average {pw / len(self.choices):.3f}; "
+                         f"this run got {self.total_reward / pw:.1%} of that")
         if self.oracle_reward is not None:
             lines.append(f"Perfect per-request routing would average {self.oracle_reward / len(self.choices):.3f}")
         share = self.counts / max(1, len(self.choices))
@@ -240,6 +244,90 @@ class LinTS(LinUCB):
         return int(np.argmax(scores))
 
 
+# ---------------------------------------------------------------- non-stationary
+# Defaults (discount 0.999, window 2000) suit streams of about 10k requests; set them to the
+# rate at which you expect quality to change.
+@register("online", "discounted_ucb", kind="non-stationary",
+          paper="Garivier & Moulines (ALT 2011), Discounted UCB", url="https://arxiv.org/abs/0805.3415",
+          summary="UCB on exponentially discounted counts, so old results fade and the policy tracks changes.")
+class DiscountedUCB(Policy):
+    def __init__(self, K, rng, gamma: float = 0.999, xi: float = 0.6, **kw):
+        super().__init__(K, rng, **kw)
+        self.gamma, self.xi = gamma, xi
+        self.dn = np.zeros(K)
+        self.ds = np.zeros(K)
+
+    def select(self, x):
+        u = self._untried()
+        if u is not None:
+            return u
+        total = self.dn.sum()
+        mean = np.divide(self.ds, self.dn, out=np.zeros(self.K), where=self.dn > 0)
+        bonus = 2 * np.sqrt(self.xi * math.log(max(total, 1.0 + 1e-9)) / np.maximum(self.dn, 1e-12))
+        return int(np.argmax(mean + bonus))
+
+    def update(self, arm, reward, x):
+        super().update(arm, reward, x)
+        self.dn *= self.gamma
+        self.ds *= self.gamma
+        self.dn[arm] += 1
+        self.ds[arm] += reward
+
+
+@register("online", "sliding_window_ucb", kind="non-stationary",
+          paper="Garivier & Moulines (ALT 2011), Sliding-Window UCB", url="https://arxiv.org/abs/0805.3415",
+          summary="UCB computed only on the last `window` requests, so the policy forgets results from before a change.")
+class SlidingWindowUCB(Policy):
+    def __init__(self, K, rng, window: int = 2000, xi: float = 0.6, **kw):
+        super().__init__(K, rng, **kw)
+        self.window, self.xi = window, xi
+        self.hist_arm: list[int] = []
+        self.hist_r: list[float] = []
+        self.wn = np.zeros(K)
+        self.ws = np.zeros(K)
+
+    def select(self, x):
+        zeros = np.flatnonzero(self.wn == 0)
+        if zeros.size:
+            return int(zeros[0])
+        mean = self.ws / self.wn
+        bonus = np.sqrt(self.xi * math.log(min(self.t, self.window) + 1) / self.wn)
+        return int(np.argmax(mean + bonus))
+
+    def update(self, arm, reward, x):
+        super().update(arm, reward, x)
+        self.hist_arm.append(arm)
+        self.hist_r.append(reward)
+        self.wn[arm] += 1
+        self.ws[arm] += reward
+        if len(self.hist_arm) > self.window:
+            old, r = self.hist_arm.pop(0), self.hist_r.pop(0)
+            self.wn[old] -= 1
+            self.ws[old] -= r
+
+
+@register("online", "discounted_thompson", kind="non-stationary",
+          paper="Raj & Kalyani (2017), Discounted Thompson Sampling", url="https://arxiv.org/abs/1707.09727",
+          summary="Thompson sampling whose Beta posteriors decay toward the prior, so it re-explores after changes.")
+class DiscountedThompson(Policy):
+    def __init__(self, K, rng, gamma: float = 0.999, **kw):
+        super().__init__(K, rng, **kw)
+        self.gamma = gamma
+        self.sa = np.zeros(K)
+        self.sb = np.zeros(K)
+
+    def select(self, x):
+        return int(np.argmax(self.rng.beta(1 + self.sa, 1 + self.sb)))
+
+    def update(self, arm, reward, x):
+        super().update(arm, reward, x)
+        r = float(self.rng.random() < reward)
+        self.sa *= self.gamma
+        self.sb *= self.gamma
+        self.sa[arm] += r
+        self.sb[arm] += 1 - r
+
+
 def run_online(task: Any, method: str = "thompson", *, horizon: int | None = None, seed: int | None = 0,
                cost_weight: float = 0.0, cost_scale: float | None = None, **options: Any) -> OnlineResult:
     """Simulate (or run live) online selection over a stream of the task's examples.
@@ -255,7 +343,8 @@ def run_online(task: Any, method: str = "thompson", *, horizon: int | None = Non
     rng = np.random.default_rng(seed)
     N, K = task.n_examples, task.n_candidates
     T = N if horizon is None else min(int(horizon), N)
-    stream = rng.permutation(N)[:T]
+    ordered = bool(getattr(task, "info", {}).get("ordered"))
+    stream = (np.arange(N) if ordered else rng.permutation(N))[:T]
     feats = None if task.features is None else np.asarray(task.features, dtype=float)
     if info.needs_features and feats is None:
         raise ValueError(f"{method} needs task.features (one vector per example)")
@@ -283,6 +372,7 @@ def run_online(task: Any, method: str = "thompson", *, horizon: int | None = Non
         policy.update(arm, u, x)
         choices[t], scores_seen[t], costs_seen[t], rewards[t] = arm, r, c, u
     best_fixed = oracle = None
+    extra_piecewise = None
     full = getattr(task.source, "scores", None)
     if full is not None:  # replay: the full matrix is known, so regret can be computed
         sub = full[:, stream]
@@ -290,6 +380,11 @@ def run_online(task: Any, method: str = "thompson", *, horizon: int | None = Non
             sub = utility(sub, costs[:, stream])
         best_fixed = float(sub.sum(1).max())
         oracle = float(sub.max(0).sum())
+        cuts = getattr(task, "info", {}).get("change_points")
+        if ordered and cuts:  # best single candidate within each segment between changes
+            edges = [0] + [c for c in cuts if c < T] + [T]
+            extra_piecewise = float(sum(sub[:, a:b].sum(1).max() for a, b in zip(edges[:-1], edges[1:]) if b > a))
     return OnlineResult(method=method, names=task.names, choices=choices, rewards=rewards, examples=stream,
                         best_fixed_reward=best_fixed, oracle_reward=oracle, scores=scores_seen,
-                        costs=None if costs is None else costs_seen, cost_weight=lam)
+                        costs=None if costs is None else costs_seen, cost_weight=lam,
+                        extra={} if extra_piecewise is None else {"best_piecewise_reward": extra_piecewise})

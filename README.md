@@ -1,42 +1,81 @@
+<div align="center">
+
 # frugal-eval
 
-**Methods from the research literature for cheaper LLM evaluation and online model selection: one interface, benchmarked on real data.**
+**Cheaper LLM evaluation and online model selection: methods from the research literature behind one interface, benchmarked on real data.**
 
 [![tests](https://github.com/raja-sunkara/frugal-eval/actions/workflows/tests.yml/badge.svg)](https://github.com/raja-sunkara/frugal-eval/actions/workflows/tests.yml)
+[![benchmark](https://github.com/raja-sunkara/frugal-eval/actions/workflows/benchmark.yml/badge.svg)](https://github.com/raja-sunkara/frugal-eval/actions/workflows/benchmark.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/raja-sunkara/frugal-eval/blob/main/examples/quickstart.ipynb)
 
-Evaluating LLMs is expensive: 10 prompts on a 1,000-question test set is 10,000 calls. A lot of that work is wasted, and the bandits, active testing and psychometrics literature has good methods for not wasting it. They are scattered across papers, each with its own code. frugal-eval puts them behind one interface and ranks them on the same real data.
+</div>
 
-It covers three problems, with 21 methods so far:
+Evaluating LLMs is expensive. Comparing 10 prompts on a 1,000-question test set costs 10,000 calls; serving every request with the strongest model costs even more. The bandits, active-testing and psychometrics literature has good methods for wasting less, but they are scattered across papers, each with its own code. frugal-eval implements them behind one interface and ranks them on the same real data: per-question results of 395 Open LLM Leaderboard models, RouterBench (11 LLMs with real prices) and 56k human votes from Chatbot Arena.
 
-| Problem | Question it answers | Example |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmark-dark.png">
+  <img alt="Benchmark of every method on real Open LLM Leaderboard results" src="docs/benchmark.png">
+</picture>
+
+| Job | Command | Typical result on real data |
 |---|---|---|
-| **Find the best** (`identify`) | Which prompt or model is best, using as few calls as possible? | Certified winner with up to 75% fewer calls |
-| **Estimate scores** (`estimate`) | What would each model score on the full benchmark, from a few questions? | Scores within ~2 points from 100 of 1,319 questions |
-| **Online selection** (`run_online`) | Which model should answer each incoming request while you are still learning? | 94% of GPT-4's quality at 23% of its cost on RouterBench |
+| **Find the best** prompt or model | `frugal-eval identify` | certified winner with **38%** fewer calls on average, up to 75% |
+| **Estimate** every model's score from a few questions | `frugal-eval estimate` | within **1.7 points** from 100 questions (92% fewer calls on GSM8K) |
+| **Route** each request while learning, optionally cost-aware | `frugal-eval route` | **94%** of GPT-4's quality at **23%** of its cost on RouterBench |
+| **Compare by votes**: pairwise human or LLM-judge comparisons | `frugal-eval duel` | best of 8 Chatbot Arena models from real human preference rates |
 
-## Try it in 30 seconds (no API key)
+## <div align="center">Quick start</div>
+
+<details open>
+<summary>Install</summary>
 
 ```bash
-pip install git+https://github.com/raja-sunkara/frugal-eval
-frugal-eval demo --task gsm8k
+pip install git+https://github.com/raja-sunkara/frugal-eval      # Python 3.9+, needs only numpy and httpx
+pip install "frugal-eval[routerbench] @ git+https://github.com/raja-sunkara/frugal-eval"   # + RouterBench download
 ```
 
-This runs every method on real per-question results of 395 Open LLM Leaderboard models, which ship with the package. Or open the [Colab notebook](https://colab.research.google.com/github/raja-sunkara/frugal-eval/blob/main/examples/quickstart.ipynb).
+</details>
 
-## Usage
+<details open>
+<summary>Try every method in 30 seconds (no API key)</summary>
+
+```bash
+frugal-eval demo                     # all methods on real leaderboard data
+frugal-eval methods                  # every method with its paper, and every built-in task
+```
+
+Or open the [Colab notebook](https://colab.research.google.com/github/raja-sunkara/frugal-eval/blob/main/examples/quickstart.ipynb).
+
+</details>
+
+<details open>
+<summary>Command line</summary>
+
+```bash
+frugal-eval identify --task leaderboard/gsm8k --method lucb           # find the best with few calls
+frugal-eval identify --csv my_scores.csv                              # ... on your own scores
+frugal-eval estimate --task leaderboard/mmlu --method irt --budget 100
+frugal-eval route    --task routerbench --method linucb --cost-weight 0.5
+frugal-eval route    --task drift/mmlu --method sliding_window_ucb    # a model silently degrades mid-stream
+frugal-eval duel     --task arena --method borda_lucb                 # pairwise votes
+```
+
+</details>
+
+<details open>
+<summary>Python</summary>
 
 ```python
 import frugal_eval as fe
 
-task = fe.tasks.make("leaderboard/gsm8k", n_candidates=10, seed=0)   # real data, 10 models
+task = fe.tasks.make("leaderboard/gsm8k", n_candidates=10, seed=0)   # 10 real models, 1,319 questions
 
-fe.identify(task, method="lucb").summary()                # find the best with few calls
-fe.estimate(task, method="irt", budget=100).summary()     # estimate every score from 100 questions
-fe.run_online(task, method="linucb").summary()            # route each question while learning
-
-fe.list_methods()                                         # every method, with its paper
+fe.identify(task, method="lucb").summary()               # find the best with few calls
+fe.estimate(task, method="irt", budget=100).summary()    # estimate every score from 100 questions
+fe.run_online(task, method="linucb").summary()           # route each question while learning
+fe.find_best_pairwise(fe.duel.arena(8)).summary()        # best of 8 Arena models from pairwise votes
 ```
 
 Real output of `fe.identify(task, method="lucb")`:
@@ -47,14 +86,15 @@ NeuralPipe-7B-slerp                    0.675  [ 0.629,  0.721]  1044/1319  <- be
 Tess-M-v1.3                            0.579  [ 0.533,  0.624]  1044/1319
 alpaca-lora-65b-en-pt-es-ca            0.254  [ 0.088,  0.419]   268/1319
 ...
-Llama-2-7b-ft-instruct-es              0.025  [ 0.000,  0.331]    80/1319
-
 Best: NeuralPipe-7B-slerp
 Certified: best within 0 with probability >= 0.95.
 Calls: 3,247 of 13,190 (75% saved)
 ```
 
-### Your own prompts and models
+</details>
+
+<details>
+<summary>Your own prompts and models (live API calls)</summary>
 
 Write one function that runs a candidate on one example and returns a score in [0, 1]:
 
@@ -74,65 +114,72 @@ def run_and_grade(candidate, example):
     return last_number(reply, example["answer"])
 
 task = fe.tasks.from_function(candidates, test_set, run_and_grade,
-                              cache_path="eval_cache.db",  # re-runs are free
-                              max_workers=8)               # parallel calls
+                              cache_path="eval_cache.db",   # re-runs are free
+                              max_workers=8)                # parallel calls
 print(fe.identify(task, method="lucb", delta=0.05).summary())
 ```
 
 `chat` works with any OpenAI-compatible API (OpenAI, Groq, Together, OpenRouter, vLLM, Ollama, a LiteLLM proxy) via `OPENAI_BASE_URL` and `OPENAI_API_KEY`. Built-in graders: `exact_match`, `contains`, `last_number`, `choice_letter`; any function returning a number in [0, 1] works, including an LLM judge.
 
-Methods that learn from history (`irt`, `anchor_points`, `stratified`) take `prior=`: results of other models on the same examples. Contextual routing methods take `features=`: one vector per example (for example a prompt embedding).
+- Methods that learn from history (`irt`, `anchor_points`, `stratified`) take `prior=`: results of other models on the same examples.
+- Contextual routers (`linucb`, `lin_ts`) take `features=`: one vector per example, such as a prompt embedding.
+- Cost-aware routing takes `costs=`: the cost of each candidate on each example; then pass `cost_weight=` to `run_online`.
+- Pairwise: `fe.duel.from_judge(candidates, judge)` where `judge(a, b)` returns 1, 0 or 0.5.
 
-Already have scores? `fe.identify(scores_array)` or `frugal-eval replay scores.csv`.
+</details>
 
-## Methods
+## <div align="center">Method zoo</div>
 
-| Problem | Method | Type | Paper | What it does |
+Every method, its headline number on the shared benchmarks (updated automatically by the [benchmark workflow](.github/workflows/benchmark.yml)), and its paper. Per-task tables: [BENCHMARKS.md](BENCHMARKS.md).
+
+<!-- ZOO:START -->
+| Problem | Method | Type | Headline result | Paper |
 |---|---|---|---|---|
-| Find the best | `uniform` | baseline | Baseline | Every candidate on the same examples in lockstep, same stopping rule as the adaptive methods. |
-| Find the best | `lucb` | fixed confidence | [Kalyanakrishnan, Tewari, Auer & Stone (ICML 2012)](https://proceedings.mlr.press/v23/kalyanakrishnan12/kalyanakrishnan12.pdf) | Evaluate the current leader and its most dangerous challenger. |
-| Find the best | `successive_elimination` | fixed confidence | [Even-Dar, Mannor & Mansour (JMLR 2006)](https://www.jmlr.org/papers/volume7/evendar06a/evendar06a.pdf) | Evaluate all surviving candidates in rounds; drop any that is confidently worse than the leader. |
-| Find the best | `lil_ucb` | fixed confidence | [Jamieson, Malloy, Nowak & Bubeck (COLT 2014)](https://proceedings.mlr.press/v35/jamieson14.pdf) | Evaluate the candidate with the highest law-of-the-iterated-logarithm UCB index. |
-| Find the best | `top_two_ts` | fixed confidence | [Russo (COLT 2016; Operations Research 2020), Top-Two Thompson Sampling](https://arxiv.org/abs/1602.08448) | Sample a leader from the posterior; with probability 1 - beta evaluate a re-sampled challenger instead. |
-| Find the best | `track_and_stop` | fixed confidence | [Garivier & Kaufmann (COLT 2016), Track-and-Stop](https://proceedings.mlr.press/v49/garivier16a.html) | Track the asymptotically optimal share of evaluations per candidate, computed from current estimates. |
-| Find the best | `eb_tc` | fixed confidence | [Jourdan, Degenne & Kaufmann (NeurIPS 2023), EB-TC](https://arxiv.org/abs/2305.16041) | Top-two method: the empirical best is the leader, the challenger minimises the transportation cost. |
-| Find the best | `successive_halving` | fixed budget | [Karnin, Koren & Somekh (ICML 2013)](https://proceedings.mlr.press/v28/karnin13.pdf) | Split the budget into rounds; after each round keep the better half. |
-| Find the best | `successive_rejects` | fixed budget | [Audibert, Bubeck & Munos (COLT 2010)](https://www.learningtheory.org/colt2010/papers/59Audibert.pdf) | Run K-1 phases of growing length; reject the worst candidate after each phase. |
-| Estimate scores | `random` | baseline | Baseline | Run a uniformly random subset and report the plain average. |
-| Estimate scores | `stratified` | classical | [Stratified sampling (Neyman, 1934), as used in efficient-benchmarking work](https://doi.org/10.2307/2342192) | Group examples by difficulty (from prior models), sample each group in proportion. |
-| Estimate scores | `anchor_points` | representative subset | [Vivek, Ethayarajh, Yang & Kiela (EACL 2024), Anchor Points](https://arxiv.org/abs/2309.08638) | Cluster examples by how prior models answered them; run one representative per cluster, weight by cluster size. |
-| Estimate scores | `irt` | model-based | [Polo, Weber, Choshen, Sun, Xu & Yurochkin (ICML 2024), tinyBenchmarks (p-IRT)](https://arxiv.org/abs/2402.14992) | Fit an item response model on prior models; infer each candidate's ability from anchor examples and predict the rest. |
-| Online selection | `uniform` | baseline | Baseline | Pick a candidate uniformly at random. |
-| Online selection | `epsilon_greedy` | non-contextual | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002), epsilon_n-greedy](https://doi.org/10.1023/A:1013689704352) | Mostly use the best so far; explore at random with a decaying probability. |
-| Online selection | `ucb1` | non-contextual | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002)](https://doi.org/10.1023/A:1013689704352) | Optimism: pick the highest upper confidence bound. |
-| Online selection | `kl_ucb` | non-contextual | [Garivier & Cappé (COLT 2011)](https://proceedings.mlr.press/v19/garivier11a/garivier11a.pdf) | Upper confidence bounds from the KL divergence; tighter than UCB1 for scores near 0 or 1. |
-| Online selection | `thompson` | non-contextual | [Agrawal & Goyal (COLT 2012); Thompson (1933)](https://proceedings.mlr.press/v23/agrawal12/agrawal12.pdf) | Sample each candidate's score from its posterior and pick the highest sample. |
-| Online selection | `exp3` | adversarial | [Auer, Cesa-Bianchi, Freund & Schapire (SIAM J. Computing 2002)](https://doi.org/10.1137/S0097539701398375) | Exponential weights with importance-weighted rewards; robust when quality drifts over time. |
-| Online selection | `linucb` | contextual | [Li, Chu, Langford & Schapire (WWW 2010)](https://arxiv.org/abs/1003.0146) | Per-candidate ridge regression on example features with an upper confidence bonus: routes each request. |
-| Online selection | `lin_ts` | contextual | [Agrawal & Goyal (ICML 2013), Thompson sampling for contextual bandits](https://proceedings.mlr.press/v28/agrawal13.pdf) | Linear Thompson sampling: sample each candidate's regression weights, route to the best sampled score. |
+| Find the best | `uniform` | baseline | **10%** fewer calls, certified | Baseline |
+| Find the best | `lucb` | fixed confidence | **38%** fewer calls, certified | [Kalyanakrishnan, Tewari, Auer & Stone (ICML 2012)](https://proceedings.mlr.press/v23/kalyanakrishnan12/kalyanakrishnan12.pdf) |
+| Find the best | `successive_elimination` | fixed confidence | **38%** fewer calls, certified | [Even-Dar, Mannor & Mansour (JMLR 2006)](https://www.jmlr.org/papers/volume7/evendar06a/evendar06a.pdf) |
+| Find the best | `lil_ucb` | fixed confidence | **19%** fewer calls, certified | [Jamieson, Malloy, Nowak & Bubeck (COLT 2014)](https://proceedings.mlr.press/v35/jamieson14.pdf) |
+| Find the best | `top_two_ts` | fixed confidence | **15%** fewer calls, certified | [Russo (COLT 2016; Operations Research 2020), Top-Two Thompson Sampling](https://arxiv.org/abs/1602.08448) |
+| Find the best | `track_and_stop` | fixed confidence | **27%** fewer calls, certified | [Garivier & Kaufmann (COLT 2016), Track-and-Stop](https://proceedings.mlr.press/v49/garivier16a.html) |
+| Find the best | `eb_tc` | fixed confidence | **26%** fewer calls, certified | [Jourdan, Degenne & Kaufmann (NeurIPS 2023), EB-TC](https://arxiv.org/abs/2305.16041) |
+| Find the best | `successive_halving` | fixed budget | 70% of calls (preset budget) | [Karnin, Koren & Somekh (ICML 2013)](https://proceedings.mlr.press/v28/karnin13.pdf) |
+| Find the best | `successive_rejects` | fixed budget | 70% of calls (preset budget) | [Audibert, Bubeck & Munos (COLT 2010)](https://www.learningtheory.org/colt2010/papers/59Audibert.pdf) |
+| Estimate scores | `random` | baseline | **3.2** pts error from 100 questions | Baseline |
+| Estimate scores | `stratified` | classical | **2.2** pts error from 100 questions | [Stratified sampling (Neyman, 1934), as used in efficient-benchmarking work](https://doi.org/10.2307/2342192) |
+| Estimate scores | `anchor_points` | representative subset | **2.1** pts error from 100 questions | [Vivek, Ethayarajh, Yang & Kiela (EACL 2024), Anchor Points](https://arxiv.org/abs/2309.08638) |
+| Estimate scores | `irt` | model-based | **1.7** pts error from 100 questions | [Polo, Weber, Choshen, Sun, Xu & Yurochkin (ICML 2024), tinyBenchmarks (p-IRT)](https://arxiv.org/abs/2402.14992) |
+| Online selection | `uniform` | baseline | **79%** of best model; RouterBench: 66% quality at 25% cost | Baseline |
+| Online selection | `epsilon_greedy` | non-contextual | **95%** of best model; RouterBench: 93% quality at 68% cost | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002), epsilon_n-greedy](https://doi.org/10.1023/A:1013689704352) |
+| Online selection | `ucb1` | non-contextual | **90%** of best model; RouterBench: 82% quality at 25% cost | [Auer, Cesa-Bianchi & Fischer (Machine Learning 2002)](https://doi.org/10.1023/A:1013689704352) |
+| Online selection | `kl_ucb` | non-contextual | **94%** of best model; RouterBench: 84% quality at 17% cost | [Garivier & Cappé (COLT 2011)](https://proceedings.mlr.press/v19/garivier11a/garivier11a.pdf) |
+| Online selection | `thompson` | non-contextual | **95%** of best model; RouterBench: 84% quality at 15% cost | [Agrawal & Goyal (COLT 2012); Thompson (1933)](https://proceedings.mlr.press/v23/agrawal12/agrawal12.pdf) |
+| Online selection | `exp3` | adversarial | **88%** of best model; RouterBench: 82% quality at 32% cost | [Auer, Cesa-Bianchi, Freund & Schapire (SIAM J. Computing 2002)](https://doi.org/10.1137/S0097539701398375) |
+| Online selection | `linucb` | contextual | **103%** of best model; RouterBench: 94% quality at 23% cost | [Li, Chu, Langford & Schapire (WWW 2010)](https://arxiv.org/abs/1003.0146) |
+| Online selection | `lin_ts` | contextual | **103%** of best model; RouterBench: 93% quality at 22% cost | [Agrawal & Goyal (ICML 2013), Thompson sampling for contextual bandits](https://proceedings.mlr.press/v28/agrawal13.pdf) |
+| Online selection | `discounted_ucb` | non-stationary | - | [Garivier & Moulines (ALT 2011), Discounted UCB](https://arxiv.org/abs/0805.3415) |
+| Online selection | `sliding_window_ucb` | non-stationary | - | [Garivier & Moulines (ALT 2011), Sliding-Window UCB](https://arxiv.org/abs/0805.3415) |
+| Online selection | `discounted_thompson` | non-stationary | - | [Raj & Kalyani (2017), Discounted Thompson Sampling](https://arxiv.org/abs/1707.09727) |
+| Pairwise | `round_robin` | baseline | - | Baseline |
+| Pairwise | `borda_lucb` | fixed confidence | - | [Jamieson, Katariya, Deshpande & Nowak (AISTATS 2015), Borda reduction; with LUCB](https://proceedings.mlr.press/v38/jamieson15.html) |
+| Pairwise | `borda_elimination` | fixed confidence | - | [Jamieson, Katariya, Deshpande & Nowak (AISTATS 2015), Borda reduction; with successive elimination](https://proceedings.mlr.press/v38/jamieson15.html) |
+| Pairwise | `savage` | fixed confidence | - | [Urvoy, Clerot, Féraud & Naamane (ICML 2013), SAVAGE](https://proceedings.mlr.press/v28/urvoy13.html) |
+<!-- ZOO:END -->
 
-## Benchmarks
+<details>
+<summary>How the numbers are measured</summary>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmark-dark.png">
-  <img alt="Benchmark of every method on real Open LLM Leaderboard results" src="docs/benchmark.png">
-</picture>
+- **Find the best**: 10 random leaderboard models per trial, 20 trials on each of 6 benchmarks (GSM8K, ARC-Challenge, Winogrande, TruthfulQA, HellaSwag, MMLU), 95% confidence. The true best model was returned in 100% of trials for every fixed-confidence method.
+- **Estimate scores**: 100 questions per model; history-based methods use 300 other leaderboard models.
+- **Online selection**: every question arrives once; share of the best single model's total score. Above 100% means routing beat every single model.
+- **RouterBench**: quality and cost relative to always using GPT-4, with `cost_weight=0.5`.
+- **Drift**: halfway through, the best model's answers are replaced by a model about half as good; share of what the best model of each half would score.
+- **Pairwise**: 8 random Chatbot Arena models; votes until a model within 2 points of win rate of the best is certified, and how often the pick is exactly right after a fixed number of votes.
 
-Real per-question results of 395 Open LLM Leaderboard models; 10 random models per trial, 20 trials on each of GSM8K, ARC-Challenge, Winogrande and TruthfulQA. Every method sees exactly the same problems.
+</details>
 
-| Problem | Best method today | Result | Baseline |
-|---|---|---|---|
-| Find the best | `lucb` / `successive_elimination` | **32% fewer calls** on average (65% on GSM8K), true best returned in 100% of trials | `uniform`: 6% |
-| Estimate scores | `irt` | **1.7 points** average error from 100 questions per model (about 92% fewer calls) | `random`: 3.3 points |
-| Online selection | `lin_ts` | **102%** of the best single model's score: routing beats every individual model | `uniform`: 75% |
+## <div align="center">Cost-aware routing on RouterBench</div>
 
-Savings in "find the best" depend on how close the candidates are: when the top models are within a fraction of a point, certifying the winner needs most of the test set, and the methods say so rather than guess. The routing features in this benchmark are learned from other models' results on each question; with your own data, use a prompt embedding.
-
-Full tables, per task: [BENCHMARKS.md](BENCHMARKS.md). Reproduce: `python benchmarks/run_all.py`.
-
-## Cost-aware routing on RouterBench
-
-[RouterBench](https://arxiv.org/abs/2403.12031) (Hu et al., 2024) has 36,497 real prompts answered by 11 LLMs, from GPT-4 and Claude to Mixtral and Llama, with the dollar cost of every answer. Each method sees every prompt once, picks one model, and learns only from the result it gets, scored as quality minus `cost_weight` × cost. Relative to always using the single best model (GPT-4), 3 trials:
+[RouterBench](https://arxiv.org/abs/2403.12031) (Hu et al., 2024) has 36,497 real prompts answered by 11 LLMs, from GPT-4 and Claude to Mixtral and Llama, with the dollar cost of every answer. Each method sees every prompt once, picks one model, and learns only from the result it gets, scored as quality minus `cost_weight` × cost. Relative to always using GPT-4:
 
 | Method | cost weight 0 | cost weight 0.5 | cost weight 1 |
 |---|---|---|---|
@@ -141,20 +188,19 @@ Full tables, per task: [BENCHMARKS.md](BENCHMARKS.md). Reproduce: `python benchm
 | `thompson` | 100% quality, 99% cost | 84% quality, 15% cost | 82% quality, 7% cost |
 | `uniform` (baseline) | 66% quality, 25% cost | 66% quality, 25% cost | 66% quality, 25% cost |
 
-Learning from scratch, the contextual routers keep 94% of GPT-4's quality for under a quarter of the price. All methods: [BENCHMARKS.md](BENCHMARKS.md).
+Learning from scratch, the contextual routers keep 94% of GPT-4's quality for under a quarter of the price.
 
-```python
-import frugal_eval as fe
+## <div align="center">Findings so far</div>
 
-task = fe.tasks.make("routerbench")      # downloads from Hugging Face on first use (pip install "frugal-eval[routerbench]")
-fe.run_online(task, method="linucb", cost_weight=0.5).summary()
-```
+- **Simple beats fancy at everyday confidence levels.** LUCB with paired comparisons saves more calls than the asymptotically optimal Track-and-Stop and EB-TC at 95% confidence. Those methods are built for very small error rates.
+- **Paired comparisons matter.** Comparing candidates on the same questions removes most of the noise; it is the main reason the adaptive methods save calls.
+- **History helps estimation.** Item response theory (tinyBenchmarks) halves the error of a random subset of the same size.
+- **Routing beats every single model.** With prompt features, contextual bandits exceed the best individual model, and with a cost penalty they cut spend by 4×.
+- **Close models need many votes.** The strongest Chatbot Arena models differ by about 1% in win rate, so certifying a winner from human votes takes on the order of 100,000 comparisons even with a 2-point tolerance.
 
-For your own traffic, pass `costs=` (cost per candidate per example) and `features=` (e.g. a prompt embedding) to `fe.tasks.from_scores`, or route live with `fe.tasks.from_function`.
+## <div align="center">Add a method or a task</div>
 
-## Add a method or a task
-
-Every method is a plugin. Register it once and it works in the API, the CLI and the benchmark:
+Every method is a plugin. Register it once and it works in the Python API, the CLI and the benchmark:
 
 ```python
 import frugal_eval as fe
@@ -166,27 +212,23 @@ def my_method(ev, budget=None, **options):
     return ev.result("confidence", "my_method")
 ```
 
-Online methods subclass `fe.Policy` (`select`, `update`); estimation methods return `(estimates, examples_used, info)`. Tasks are registered the same way with `fe.tasks.register_task`. New methods from recent papers are added regularly; contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Online methods subclass `fe.Policy` (`select`, `update`); estimation methods return `(estimates, examples_used, info)`; pairwise methods receive a `DuelState`. Tasks register with `fe.tasks.register_task`. New methods from recent papers are added regularly. See [CONTRIBUTING.md](CONTRIBUTING.md), and open an issue to suggest a paper.
 
-## How the guarantee works
+## <div align="center">How the guarantee works</div>
 
-All candidates go through the test set in the same random order, and comparisons use **paired differences** on the questions both have seen, which removes most of the noise. Confidence intervals use finite-population bounds (Hoeffding–Serfling and empirical Bernstein–Serfling, [Bardenet & Maillard 2015](https://arxiv.org/abs/1309.4029)) that hold for all candidates and all steps at once and shrink to zero once the whole test set is covered. Fixed-confidence methods stop when the leader beats every other candidate by more than the uncertainty: with probability at least `1 - delta`, the winner is within `epsilon` of what a full evaluation would pick. Fixed-budget methods spend the budget you give them and say the answer is not certified.
+All candidates go through the test set in the same random order, and comparisons use **paired differences** on the questions both have seen. Confidence intervals use finite-population bounds (Hoeffding–Serfling and empirical Bernstein–Serfling, [Bardenet & Maillard 2015](https://arxiv.org/abs/1309.4029)) that hold for all candidates and all steps at once and shrink to zero once the whole test set is covered. Fixed-confidence methods stop when the leader beats every other candidate by more than the uncertainty: with probability at least `1 - delta`, the winner is within `epsilon` of what a full evaluation would pick. Fixed-budget methods spend the budget you give them and say the answer is not certified.
 
-## Roadmap
+## <div align="center">Roadmap</div>
 
-Planned additions, all from published work:
+All from published work:
 
-- Top-Two UCB (Jourdan & Degenne, NeurIPS 2023) and other recent top-two methods
-- Confidence sequences for sampling without replacement (Waudby-Smith & Ramdas, NeurIPS 2020)
-- Low-rank evaluation acceleration (Zhou et al., ICLR 2025) and model-similarity methods (SySRs, ICML 2026)
-- gp-IRT and more estimators from tinyBenchmarks (Polo et al., ICML 2024)
-- More routing benchmarks and per-request budgets
+- Top-Two UCB and other recent top-two methods; confidence sequences for sampling without replacement (Waudby-Smith & Ramdas, NeurIPS 2020)
+- Low-rank evaluation acceleration (Zhou et al., ICLR 2025) and model-similarity methods (SySRs, ICML 2026); gp-IRT (Polo et al., ICML 2024)
+- Contextual dueling bandits and Bradley-Terry active ranking for LLM-judge evaluations
 - Integrations with promptfoo, Inspect and lm-evaluation-harness; PyPI release
 
-## Citation and data
+## <div align="center">Citation, data and license</div>
 
-If frugal-eval helps your research, please cite this repository and the papers of the methods you use (listed above). The bundled benchmark data comes from [tinyBenchmarks](https://github.com/felipemaiapolo/tinyBenchmarks) (Polo et al., 2024, MIT license); see `frugal_eval/data/NOTICE`.
+If frugal-eval helps your research, please cite it (see [CITATION.cff](CITATION.cff)) and the papers of the methods you use. Bundled data: Open LLM Leaderboard per-question results from [tinyBenchmarks](https://github.com/felipemaiapolo/tinyBenchmarks) (MIT) and Chatbot Arena vote counts from [lmarena-ai/arena-human-preference-55k](https://huggingface.co/datasets/lmarena-ai/arena-human-preference-55k) (Apache-2.0); see `frugal_eval/data/NOTICE`. RouterBench is downloaded from Hugging Face on first use.
 
-## License
-
-MIT
+frugal-eval is released under the MIT license.

@@ -22,3 +22,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+arena_votes.npz holds per-pair human vote counts (wins and ties only; no prompts or
+answers) aggregated from the LMSYS Chatbot Arena human preference dataset
+(https://huggingface.co/datasets/lmarena-ai/arena-human-preference-55k),
+licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0). Aggregated by
+benchmarks/fetch/arena.py.

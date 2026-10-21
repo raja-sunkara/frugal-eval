@@ -214,3 +214,32 @@ def routerbench(n_examples: int | None = None, seed: int = 0, features: str = "e
     return Task("routerbench", MatrixSource(mat, [str(m) for m in d["models"]]), features=np.hstack(parts),
                 truth=mat.mean(1), costs=costs[:, cols],
                 info={"benchmark_kind": coarse[cols], "source": "https://huggingface.co/datasets/withmartian/routerbench"})
+
+
+def leaderboard_drift(task: str = "gsm8k", n_candidates: int = 10, seed: int = 0, drop_to: float = 0.5) -> Task:
+    """Online selection where the best model silently gets worse halfway through the stream.
+
+    Real leaderboard results; from the midpoint on, the best candidate's answers are replaced by
+    those of a weaker leaderboard model (scoring about ``drop_to`` times as well), as when a provider
+    quietly swaps the model behind an endpoint. The stream is served in order (``info["ordered"]``).
+    """
+    scores, names = leaderboard_matrix(task)
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(scores.shape[0])
+    cand, rest = perm[:n_candidates], perm[n_candidates:]
+    cols = rng.permutation(scores.shape[1])
+    mat = scores[np.ix_(cand, cols)].copy()
+    means = mat.mean(1)
+    best = int(np.argmax(means))
+    target = drop_to * means[best]
+    pool_means = scores[rest].mean(1)
+    repl = rest[int(np.argmin(np.abs(pool_means - target)))]
+    half = mat.shape[1] // 2
+    mat[best, half:] = scores[repl, cols[half:]]
+    short = [names[i].split("/")[-1][:40] for i in cand]
+    return Task(f"drift/{task}", MatrixSource(mat, short), truth=mat.mean(1),
+                info={"ordered": True, "change_points": [half], "changed": short[best], "seed": seed})
+
+
+for _t in LEADERBOARD_TASKS:
+    register_task(f"drift/{_t}")(lambda _t=_t, **kw: leaderboard_drift(_t, **kw))

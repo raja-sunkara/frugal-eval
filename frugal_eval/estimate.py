@@ -52,7 +52,7 @@ class EstimateResult:
                 row += f"  {self.truth[k]:7.3f}  {self.errors[k]:+7.3f}"
             lines.append(row)
         lines += ["", f"Method: {self.method}. Examples run: {len(self.examples)} of {self.n_examples} per candidate "
-                      f"({self.savings:.0%} of calls saved)."]
+                      f"({self.savings:.1%} of calls saved)."]
         if self.truth is not None:
             lines.append(f"Mean absolute error: {self.mae:.4f}")
         return "\n".join(lines)

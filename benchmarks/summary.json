@@ -99,5 +99,55 @@
    "winogrande"
   ],
   "trials": 20
+ },
+ "routing": {
+  "uniform": {
+   "quality": 66.4,
+   "cost": 25.4,
+   "setting": "cost weight 0.5",
+   "kind": "baseline"
+  },
+  "epsilon_greedy": {
+   "quality": 92.6,
+   "cost": 68.1,
+   "setting": "cost weight 0.5",
+   "kind": "non-contextual"
+  },
+  "ucb1": {
+   "quality": 82.2,
+   "cost": 24.8,
+   "setting": "cost weight 0.5",
+   "kind": "non-contextual"
+  },
+  "kl_ucb": {
+   "quality": 83.5,
+   "cost": 17.1,
+   "setting": "cost weight 0.5",
+   "kind": "non-contextual"
+  },
+  "thompson": {
+   "quality": 83.7,
+   "cost": 15.4,
+   "setting": "cost weight 0.5",
+   "kind": "non-contextual"
+  },
+  "exp3": {
+   "quality": 82.2,
+   "cost": 31.8,
+   "setting": "cost weight 0.5",
+   "kind": "adversarial"
+  },
+  "linucb": {
+   "quality": 94.3,
+   "cost": 23.0,
+   "setting": "cost weight 0.5",
+   "kind": "contextual"
+  },
+  "lin_ts": {
+   "quality": 92.7,
+   "cost": 22.1,
+   "setting": "cost weight 0.5",
+   "kind": "contextual"
+  }
  }
 }

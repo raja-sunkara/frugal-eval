@@ -1,0 +1,16 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command or code you ran, what you expected and what you got (full error message)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Output of `python -c "import frugal_eval, numpy, sys; print(frugal_eval.__version__, numpy.__version__, sys.version)"`

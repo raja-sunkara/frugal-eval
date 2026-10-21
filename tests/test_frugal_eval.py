@@ -28,7 +28,7 @@ def lb_task():
 # ------------------------------------------------------------ registry
 def test_every_method_has_a_paper_and_runs_through_the_registry():
     methods = list_methods()
-    assert {m.problem for m in methods} == {"identify", "estimate", "online"}
+    assert {m.problem for m in methods} == {"identify", "estimate", "online", "duel"}
     for m in methods:
         assert m.paper, m.name
     assert len(list_methods("identify")) >= 7 and len(list_methods("estimate")) >= 4
@@ -200,3 +200,47 @@ def test_routerbench_task_when_cached():
     assert task.n_candidates == 11 and task.costs.shape == (11, 2000)
     r = fe.run_online(task, method="linucb", cost_weight=0.5)
     assert r.total_cost < task.costs[int(np.argmax(task.truth))].sum()
+
+
+# ------------------------------------------------------------ pairwise
+@pytest.mark.parametrize("method", [m.name for m in list_methods("duel")])
+def test_pairwise_methods_find_borda_winner(method):
+    task = fe.duel.synthetic_duel(6, seed=3, spread=1.5)
+    r = fe.find_best_pairwise(task, method=method, delta=0.05, budget=200_000)
+    assert r.certified and r.best == int(np.argmax(task.borda))
+
+
+def test_pairwise_budget_and_arena_data():
+    task = fe.duel.arena(8, seed=0)
+    assert task.n_candidates == 8 and np.allclose(task.prefs + task.prefs.T, 1)
+    r = fe.find_best_pairwise(task, budget=500)
+    assert r.comparisons <= 510 and not r.certified
+
+
+def test_bradley_terry_recovers_order():
+    from frugal_eval.duel import bradley_terry
+
+    rng = np.random.default_rng(0)
+    theta = np.array([2.0, 1.0, 0.0, -1.0])
+    p = 1 / (1 + np.exp(-(theta[:, None] - theta[None, :])))
+    wins = rng.binomial(200, p) * (1 - np.eye(4))
+    assert list(np.argsort(-bradley_terry(wins))) == [0, 1, 2, 3]
+
+
+# ------------------------------------------------------------ drift
+def test_drift_task_and_nonstationary_methods():
+    task = fe.tasks.make("drift/gsm8k", seed=1)
+    assert task.info["ordered"] and task.info["change_points"]
+    for method in ("discounted_ucb", "sliding_window_ucb", "discounted_thompson"):
+        r = fe.run_online(task, method=method, seed=0)
+        assert np.array_equal(r.examples, np.arange(task.n_examples))
+        assert 0 < r.total_reward <= r.extra["best_piecewise_reward"] * 1.2
+
+
+def test_cli_commands(capsys):
+    assert main(["identify", "--task", "leaderboard/truthfulqa", "--k", "5"]) == 0
+    assert main(["estimate", "--task", "leaderboard/gsm8k", "--budget", "40", "--k", "5"]) == 0
+    assert main(["route", "--task", "drift/truthfulqa", "--method", "thompson"]) == 0
+    assert main(["duel", "--task", "synthetic", "--k", "5", "--budget", "20000"]) == 0
+    out = capsys.readouterr().out
+    assert "Best:" in out and "Mean absolute error" in out and "segment" in out

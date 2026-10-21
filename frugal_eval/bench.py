@@ -170,3 +170,95 @@ def routing_markdown(rows: list[dict]) -> str:
                            for t in settings)
         lines.append(f"| `{m}` | {info[m].kind} | {cells} |")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- pairwise comparisons
+def _duel_one(job: tuple) -> dict:
+    from .duel import arena, find_best_pairwise
+
+    method, pick, trial, eps, cap, budgets = job
+    task = arena(8, seed=trial, pick=pick)
+    b = task.borda
+    true = int(np.argmax(b))
+    r = find_best_pairwise(task, method=method, epsilon=eps, budget=cap, seed=trial)
+    row = dict(problem="duel", method=method, task=f"arena/{pick}", trial=trial, comparisons=r.comparisons,
+               certified=r.certified, correct=bool(b[r.best] >= b.max() - eps - 1e-12))
+    for n in budgets:
+        rb = find_best_pairwise(task, method=method, budget=n, seed=1000 + trial)
+        row[f"right_at_{n}"] = bool(rb.best == true)
+    return row
+
+
+def run_duel(methods: Sequence[str] | None = None, trials: int = 20, epsilon: float = 0.02, cap: int = 300_000,
+             budgets: Sequence[int] = (1000, 5000), workers: int | None = None) -> list[dict]:
+    """Pairwise methods on Chatbot Arena human votes, 8 models per trial (random and the top 8)."""
+    methods = list(methods) if methods else [m.name for m in list_methods("duel")]
+    jobs = [(m, pick, i, epsilon, cap, tuple(budgets)) for m in methods for pick in ("random", "top")
+            for i in range(trials if pick == "random" else max(3, trials // 2))]
+    workers = workers or os.cpu_count() or 1
+    if workers == 1:
+        return [_duel_one(j) for j in jobs]
+    with Pool(workers) as pool:
+        return pool.map(_duel_one, jobs, chunksize=1)
+
+
+def duel_markdown(rows: list[dict]) -> str:
+    methods = list(dict.fromkeys(r["method"] for r in rows))
+    picks = list(dict.fromkeys(r["task"] for r in rows))
+    budgets = sorted(int(k.split("_")[-1]) for k in rows[0] if k.startswith("right_at_"))
+    info = {m.name: m for m in list_methods("duel")}
+    head = ["Method", "Type"]
+    for p in picks:
+        head += [f"{p}: votes to certify (median)"] + [f"{p}: right after {n:,} votes" for n in budgets]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    med = {}
+    for m in methods:
+        cells = [f"`{m}`", info[m].kind]
+        for p in picks:
+            rs = [r for r in rows if r["method"] == m and r["task"] == p]
+            v = float(np.median([r["comparisons"] for r in rs]))
+            cert = np.mean([r["certified"] for r in rs])
+            med.setdefault(m, []).append(v)
+            cells.append(f"{v:,.0f}" + ("" if cert == 1 else f" ({cert:.0%} certified)"))
+            cells += [f"{np.mean([r[f'right_at_{n}'] for r in rs]):.0%}" for n in budgets]
+        lines.append("| " + " | ".join(cells) + " |")
+    order = sorted(range(2, len(lines)), key=lambda i: np.mean(med[methods[i - 2]]))
+    return "\n".join(lines[:2] + [lines[i] for i in order])
+
+
+# ---------------------------------------------------------------- drift
+def _drift_one(job: tuple) -> dict:
+    from .tasks import make
+
+    method, bench, trial = job
+    task = make(f"drift/{bench}", seed=trial)
+    r = run_online(task, method=method, seed=trial)
+    T = len(r.choices)
+    return dict(problem="drift", method=method, task=f"drift/{bench}", trial=trial,
+                vs_piecewise=r.total_reward / r.extra["best_piecewise_reward"],
+                avg=r.average_score, best_fixed=r.best_fixed_reward / T)
+
+
+def run_drift(methods: Sequence[str] | None = None, benches: Sequence[str] = ("mmlu", "hellaswag", "gsm8k"),
+              trials: int = 10, workers: int | None = None) -> list[dict]:
+    """Non-contextual online methods when the best model silently degrades halfway through."""
+    methods = list(methods) if methods else [m.name for m in list_methods("online") if not m.needs_features]
+    jobs = [(m, b, i) for m in methods for b in benches for i in range(trials)]
+    workers = workers or os.cpu_count() or 1
+    if workers == 1:
+        return [_drift_one(j) for j in jobs]
+    with Pool(workers) as pool:
+        return pool.map(_drift_one, jobs, chunksize=2)
+
+
+def drift_markdown(rows: list[dict]) -> str:
+    s = summarize(rows)
+    methods = list(dict.fromkeys(r["method"] for r in rows))
+    tasks = list(dict.fromkeys(r["task"] for r in rows))
+    info = {m.name: m for m in list_methods("online")}
+    lines = ["| Method | Type | " + " | ".join(tasks) + " | Avg |", "|" + "---|" * (len(tasks) + 3)]
+    avg = {m: np.mean([s[(m, t)]["vs_piecewise"] for t in tasks]) for m in methods}
+    for m in sorted(methods, key=lambda m: -avg[m]):
+        cells = " | ".join(f"{s[(m, t)]['vs_piecewise']:.1%}" for t in tasks)
+        lines.append(f"| `{m}` | {info[m].kind} | {cells} | **{avg[m]:.1%}** |")
+    return "\n".join(lines)

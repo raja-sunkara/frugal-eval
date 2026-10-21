@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- New problem, pairwise comparisons (`find_best_pairwise`, `frugal-eval duel`): round robin, Borda reduction with
+  LUCB and with successive elimination (Jamieson et al., AISTATS 2015), SAVAGE (Urvoy et al., ICML 2013)
+- Chatbot Arena human vote counts bundled (lmarena-ai/arena-human-preference-55k, Apache-2.0): 59 models, 56k votes
+- Drift scenario (`drift/<benchmark>`): the best model silently degrades mid-stream; non-stationary methods
+  Discounted UCB and Sliding-Window UCB (Garivier & Moulines, ALT 2011) and Discounted Thompson Sampling
+  (Raj & Kalyani, 2017)
+- One command per job: `frugal-eval identify | estimate | route | duel`
+- README method zoo, updated automatically by the benchmark workflow; CITATION.cff; issue and PR templates
+- Fixed the RouterBench benchmark job (data was prepared separately in every worker process)
+
 ## 0.4.0
 
 - Cost-aware online selection: `run_online(..., cost_weight=)` trades quality against dollar cost
