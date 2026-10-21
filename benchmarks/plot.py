@@ -29,7 +29,7 @@ PANELS = [
 def draw(summary: dict, theme: str, path: str) -> None:
     c = THEMES[theme]
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 10})
-    panels = [p for p in PANELS if p[0] in summary]
+    panels = [p for p in PANELS if p[0] in summary]  # "_meta" is not a panel
     fig, axes = plt.subplots(1, len(panels), figsize=(4.4 * len(panels), 4.1), facecolor=c["surface"], squeeze=False)
     for ax, (key, title, xlabel, fmt, lower_better) in zip(axes[0], panels):
         items = [(n, d["value"]) for n, d in summary[key].items() if d["kind"] != "fixed budget"]
@@ -62,8 +62,11 @@ def draw(summary: dict, theme: str, path: str) -> None:
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
         ax.spines["bottom"].set_color(c["grid"])
+    meta = summary.get("_meta") or {}
+    n_tasks = len(meta.get("tasks") or []) or 4
+    trials = meta.get("trials") or 20
     fig.text(0.01, 0.01, "Real per-question results of 395 Open LLM Leaderboard models · 10 models per trial · "
-             "20 trials × 4 benchmarks · gray = baseline", color=c["ink2"], fontsize=8.5)
+             f"{trials} trials × {n_tasks} benchmarks · gray = baseline", color=c["ink2"], fontsize=8.5)
     fig.tight_layout(rect=(0, 0.04, 1, 1), w_pad=3)
     fig.savefig(path, dpi=180, facecolor=c["surface"])
     plt.close(fig)

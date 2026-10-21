@@ -88,5 +88,14 @@
    "kind": "contextual",
    "value": 102.0
   }
+ },
+ "_meta": {
+  "tasks": [
+   "gsm8k",
+   "arc_challenge",
+   "winogrande",
+   "truthfulqa"
+  ],
+  "trials": 20
  }
 }

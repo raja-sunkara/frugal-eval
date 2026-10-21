@@ -1,0 +1,48 @@
+# Downloads evaluation data that is hosted outside GitHub (e.g. Hugging Face),
+# stores a compact copy and a report on a separate branch for review.
+# Nothing lands on main until a maintainer reviews it.
+name: fetch-data
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: "Dataset script in benchmarks/fetch/ (without .py)"
+        default: "routerbench"
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/fetch/**"
+      - ".github/workflows/fetch-data.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DATASET: ${{ inputs.dataset || 'routerbench' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas huggingface_hub sentence-transformers
+      - id: fetch
+        run: python benchmarks/fetch/$DATASET.py out
+        continue-on-error: true
+      - name: Publish data and report to a review branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/out && cp -r out/. /tmp/out/ 2>/dev/null || true
+          echo "fetch step outcome: ${{ steps.fetch.outcome }}" > /tmp/out/STATUS
+          git checkout --orphan "data/$DATASET"
+          git rm -rq --cached . && git clean -fdq -e out
+          rm -rf out && cp -r /tmp/out/. .
+          git add -A
+          git commit -qm "Data snapshot: $DATASET"
+          git push -f origin "data/$DATASET"

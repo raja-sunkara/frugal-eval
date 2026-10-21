@@ -1,0 +1,64 @@
+# Runs every method on every bundled benchmark in parallel (one job per task),
+# then regenerates BENCHMARKS.md, benchmarks/summary.json and the README figure.
+# Start it from the Actions tab ("Run workflow"); it also runs weekly.
+name: benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: "Trials per task"
+        default: "20"
+  schedule:
+    - cron: "17 6 * * 0"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/benchmark.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [gsm8k, arc_challenge, winogrande, truthfulqa, hellaswag, mmlu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - run: python benchmarks/run_all.py --tasks ${{ matrix.task }} --trials ${{ inputs.trials || '20' }} --raw-only out/${{ matrix.task }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-${{ matrix.task }}
+          path: out/${{ matrix.task }}.json
+
+  report:
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e . matplotlib
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raw-*
+          path: out
+          merge-multiple: true
+      - run: python benchmarks/run_all.py --merge out/*.json
+      - name: Commit updated results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add BENCHMARKS.md benchmarks/summary.json docs/benchmark.png docs/benchmark-dark.png
+          git diff --cached --quiet || git commit -m "Update benchmark results"
+          git push
