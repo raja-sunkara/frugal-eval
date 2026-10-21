@@ -75,6 +75,8 @@ def load_routerbench(path: str | None = None) -> dict[str, np.ndarray]:
     """RouterBench arrays, downloading and caching them on first use."""
     path = path or os.path.join(cache_dir(), "routerbench.npz")
     if not os.path.exists(path):
-        prepare_routerbench(path)
+        tmp = f"{path}.{os.getpid()}.tmp.npz"
+        prepare_routerbench(tmp)
+        os.replace(tmp, path)  # atomic: concurrent processes never see a half-written file
     with np.load(path) as f:
         return {k: f[k] for k in f.files}

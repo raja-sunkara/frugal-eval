@@ -12,8 +12,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "benchmarks/fetch/**"
-      - ".github/workflows/fetch-data.yml"
+      - "benchmarks/fetch/arena.py"
 
 permissions:
   contents: write
@@ -23,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      DATASET: ${{ inputs.dataset || 'routerbench' }}
+      DATASET: ${{ inputs.dataset || 'arena' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

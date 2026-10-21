@@ -120,11 +120,20 @@ def to_markdown(problem: str, rows: list[dict]) -> str:
 ROUTING_WEIGHTS = (0.0, 0.5, 1.0)
 
 
+_TASK_CACHE: dict = {}
+
+
+def _routerbench_task():
+    if "routerbench" not in _TASK_CACHE:  # build once per worker process
+        from .tasks import make
+
+        _TASK_CACHE["routerbench"] = make("routerbench")
+    return _TASK_CACHE["routerbench"]
+
+
 def _routing_one(job: tuple) -> dict:
     method, weight, trial = job
-    from .tasks import make
-
-    task = make("routerbench")
+    task = _routerbench_task()
     S, C = task.source.scores, task.costs
     ref = int(np.argmax(S.mean(1)))  # best single model (GPT-4 on RouterBench)
     r = run_online(task, method=method, seed=trial, cost_weight=weight)
@@ -137,6 +146,9 @@ def _routing_one(job: tuple) -> dict:
 def run_routing(methods: Sequence[str] | None = None, weights: Sequence[float] = ROUTING_WEIGHTS,
                 trials: int = 5, workers: int | None = None) -> list[dict]:
     """Online methods on RouterBench, trading answer quality against dollar cost."""
+    from .datasets import load_routerbench
+
+    load_routerbench()  # download and embed once, before the worker processes start
     methods = list(methods) if methods else [m.name for m in list_methods("online")]
     jobs = [(m, w, i) for m in methods for w in weights for i in range(trials)]
     workers = workers or os.cpu_count() or 1
