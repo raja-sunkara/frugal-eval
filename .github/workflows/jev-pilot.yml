@@ -1,0 +1,65 @@
+# Jev pilot (experiment branch only). Needs a repository secret TYPESAFE_API_KEY or AI_GATEWAY_API_KEY.
+# The output is encrypted with experiments/jev/results_public_key.pem before it is stored, so only the
+# holder of the matching private key can read it; logs show progress counts only.
+name: jev-pilot
+
+on:
+  push:
+    branches: [experiment/jev]
+    paths:
+      - "experiments/jev/**"
+      - ".github/workflows/jev-pilot.yml"
+  workflow_dispatch:
+    inputs:
+      n:
+        description: "Number of RouterBench prompts"
+        default: "2000"
+
+permissions:
+  contents: write
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+      JEV_N: ${{ inputs.n || '2000' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check for an API key
+        id: key
+        run: |
+          if [ -z "$TYPESAFE_API_KEY" ] && [ -z "$AI_GATEWAY_API_KEY" ]; then
+            echo "No TYPESAFE_API_KEY or AI_GATEWAY_API_KEY secret yet; nothing to do."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.key.outputs.ready == 'true'
+        run: pip install numpy pandas requests huggingface_hub
+      - if: steps.key.outputs.ready == 'true'
+        run: python experiments/jev/pilot.py out
+      - name: Encrypt and store the output
+        if: steps.key.outputs.ready == 'true'
+        run: |
+          cd out
+          tar czf results.tgz jev_features.npz meta.json
+          openssl rand 32 > aes.key
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:aes.key -in results.tgz -out results.tgz.enc
+          openssl pkeyutl -encrypt -pubin -inkey ../experiments/jev/results_public_key.pem -in aes.key -out aes.key.enc
+          rm aes.key results.tgz jev_features.npz meta.json
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan jev-results
+          git rm -rq --cached . && git clean -fdq -e out
+          mv out/results.tgz.enc out/aes.key.enc .
+          rm -rf out
+          git add results.tgz.enc aes.key.enc
+          git commit -qm "Encrypted Jev pilot output"
+          git push -f origin jev-results
