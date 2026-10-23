@@ -7,10 +7,13 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONIOENCODING: utf-8
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.9", "3.11", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -19,3 +22,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: pytest -q
+      - name: Command line smoke test
+        run: |
+          frugal-eval methods
+          frugal-eval identify --task leaderboard/truthfulqa --k 5
+          frugal-eval duel --task synthetic --k 5 --budget 20000

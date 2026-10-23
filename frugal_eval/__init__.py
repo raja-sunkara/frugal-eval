@@ -26,4 +26,4 @@ __all__ = [
     "Result", "EstimateResult", "OnlineResult", "Evaluation", "Policy", "MethodInfo",
     "MatrixSource", "FunctionSource", "ALGORITHMS", "find_best_pairwise", "DuelTask", "DuelResult", "duel",
 ]
-__version__ = "0.5.0"
+__version__ = "0.6.0"

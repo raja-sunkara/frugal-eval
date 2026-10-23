@@ -7,7 +7,7 @@ authors:
 type: software
 license: MIT
 repository-code: "https://github.com/raja-sunkara/frugal-eval"
-version: 0.5.0
+version: 0.6.0
 date-released: 2026-10-21
 keywords:
   - LLM evaluation

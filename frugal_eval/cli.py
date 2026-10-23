@@ -29,7 +29,7 @@ from .tasks import LEADERBOARD_TASKS, from_scores, leaderboard, list_tasks, make
 
 
 def _read_csv(path: str) -> tuple[np.ndarray, list[str]]:
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.reader(f))
     if len(rows) < 2:
         raise SystemExit("CSV needs a header row and at least one row of scores")

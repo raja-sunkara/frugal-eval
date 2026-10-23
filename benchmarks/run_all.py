@@ -113,7 +113,7 @@ def write_reports(raw: dict, trials: int) -> None:
               "Open LLM Leaderboard (via tinyBenchmarks, MIT license). "
               f"Tasks: {', '.join(tasks)}. {trials} trials per task. "
               "Reproduce with `python benchmarks/run_all.py`, or run the Benchmark workflow on GitHub.\n\n")
-    with open(os.path.join(ROOT, "BENCHMARKS.md"), "w") as f:
+    with open(os.path.join(ROOT, "BENCHMARKS.md"), "w", encoding="utf-8") as f:
         f.write(header + "\n".join(sections))
     write_summary(raw, tasks=tasks, trials=trials)
     print("wrote BENCHMARKS.md and benchmarks/summary.json")
@@ -211,13 +211,13 @@ def zoo_markdown(summary: dict) -> str:
 
 def update_readme_zoo(summary: dict) -> None:
     path = os.path.join(ROOT, "README.md")
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         text = f.read()
     start, end = "<!-- ZOO:START -->", "<!-- ZOO:END -->"
     if start in text and end in text:
         a, b = text.index(start) + len(start), text.index(end)
         text = text[:a] + "\n" + zoo_markdown(summary) + "\n" + text[b:]
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(text)
         print("updated the README method zoo")
 

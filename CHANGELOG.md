@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Trade-off curve experiments (`benchmarks/curves.py`), refreshed by the benchmark workflow:
+  accuracy vs budget for finding the best, error vs questions for estimation, a quality vs cost
+  Pareto curve on RouterBench, and savings vs number of candidates
+- Tests run on Linux, macOS and Windows with Python 3.9, 3.11 and 3.13, plus command line smoke tests
+- UTF-8 file handling everywhere
+
 ## 0.5.0
 
 - New problem, pairwise comparisons (`find_best_pairwise`, `frugal-eval duel`): round robin, Borda reduction with
