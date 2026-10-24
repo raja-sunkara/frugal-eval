@@ -1,0 +1,3 @@
+frugal-eval[routerbench] @ git+https://github.com/raja-sunkara/frugal-eval
+matplotlib
+pandas

@@ -1,0 +1,49 @@
+# Publishes space/ as a Hugging Face Space.
+# One-time setup: create a Hugging Face access token with write access and add it as the
+# repository secret HF_TOKEN. Optionally set the repository variable HF_SPACE
+# (e.g. "your-hf-username/frugal-eval"); by default the Space goes under the token owner's account.
+name: deploy-space
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "space/**"
+      - ".github/workflows/deploy-space.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE: ${{ vars.HF_SPACE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for a token
+        id: key
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "No HF_TOKEN secret yet; skipping deployment."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v5
+        if: steps.key.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+      - if: steps.key.outputs.ready == 'true'
+        run: pip install huggingface_hub
+      - if: steps.key.outputs.ready == 'true'
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space = os.environ.get("HF_SPACE") or f"{api.whoami()['name']}/frugal-eval"
+          api.create_repo(space, repo_type="space", space_sdk="gradio", exist_ok=True)
+          api.upload_folder(folder_path="space", repo_id=space, repo_type="space",
+                            commit_message="Update demo from GitHub")
+          print(f"Deployed: https://huggingface.co/spaces/{space}")
+          PY
