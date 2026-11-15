@@ -24,7 +24,7 @@ Every method on the same real data: per-question results of 395 models from the 
 
 | Method | Type | arc_challenge | gsm8k | hellaswag | mmlu | truthfulqa | winogrande | Avg error |
 |---|---|---|---|---|---|---|---|---|
-| `irt` | model-based | 1.8 pts (rank ρ 0.88) | 2.3 pts (rank ρ 0.97) | 1.1 pts (rank ρ 0.90) | 2.1 pts (rank ρ 0.91) | 1.3 pts (rank ρ 0.97) | 1.5 pts (rank ρ 0.81) | **1.7 pts** |
+| `irt` | model-based | 1.8 pts (rank ρ 0.88) | 2.3 pts (rank ρ 0.97) | 1.1 pts (rank ρ 0.90) | 2.1 pts (rank ρ 0.91) | 1.3 pts (rank ρ 0.96) | 1.5 pts (rank ρ 0.81) | **1.7 pts** |
 | `anchor_points` | representative subset | 1.8 pts (rank ρ 0.94) | 3.2 pts (rank ρ 0.96) | 1.2 pts (rank ρ 0.92) | 2.1 pts (rank ρ 0.93) | 1.4 pts (rank ρ 0.96) | 2.6 pts (rank ρ 0.83) | **2.1 pts** |
 | `stratified` | classical | 2.4 pts (rank ρ 0.82) | 2.2 pts (rank ρ 0.96) | 1.8 pts (rank ρ 0.84) | 2.7 pts (rank ρ 0.89) | 1.9 pts (rank ρ 0.95) | 2.3 pts (rank ρ 0.78) | **2.2 pts** |
 | `random` | baseline | 3.8 pts (rank ρ 0.90) | 2.9 pts (rank ρ 0.95) | 2.6 pts (rank ρ 0.82) | 3.7 pts (rank ρ 0.88) | 2.8 pts (rank ρ 0.92) | 3.6 pts (rank ρ 0.79) | **3.2 pts** |
@@ -53,7 +53,7 @@ RouterBench (Hu et al., 2024): 36,497 real prompts, 11 LLMs, the dollar cost of 
 
 | Method | Type | cost weight 0 | cost weight 0.5 | cost weight 1 |
 |---|---|---|---|---|
-| `linucb` | contextual | 99% quality, 81% cost | 94% quality, 23% cost | 89% quality, 13% cost |
+| `linucb` | contextual | 99% quality, 82% cost | 94% quality, 23% cost | 88% quality, 13% cost |
 | `lin_ts` | contextual | 99% quality, 77% cost | 93% quality, 23% cost | 89% quality, 15% cost |
 | `thompson` | non-contextual | 100% quality, 99% cost | 83% quality, 13% cost | 82% quality, 7% cost |
 | `kl_ucb` | non-contextual | 99% quality, 98% cost | 84% quality, 18% cost | 81% quality, 7% cost |

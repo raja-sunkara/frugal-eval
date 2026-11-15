@@ -8,7 +8,7 @@
  "estimate/random@50": 4.79,
  "estimate/stratified@50": 3.22,
  "estimate/anchor_points@50": 2.78,
- "estimate/irt@50": 2.32,
+ "estimate/irt@50": 2.33,
  "scaling/uniform@5": 14.3,
  "scaling/uniform@10": 7.5,
  "scaling/uniform@20": 6.6,
